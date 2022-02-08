@@ -76,7 +76,7 @@ const app = {
         //         export: "default",
         //     },
         // },
-        index: path.resolve(__dirname, "src/app/index.ts"),
+        index: path.resolve(__dirname, "src/app/index.js"),
     },
 
     /*
