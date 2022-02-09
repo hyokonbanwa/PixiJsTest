@@ -76,7 +76,7 @@ const app = {
         //         export: "default",
         //     },
         // },
-        index: path.resolve(__dirname, "src/app/index.js"),
+        index: path.resolve(__dirname, "src/app/index.ts"),
     },
 
     /*
@@ -275,8 +275,8 @@ const app = {
         //https://qiita.com/Statham/items/8a1161c7816e360590f3
         //https://na-ginnan.com/react-webpack-path-config/
         // alias: {
-        //     "@framework": path.resolve(__dirname, "./src/cubism/Framework/src"), //import文で指定できる
-        //     //Mymodule: path.resolve(__dirname, "./src/indexApp/myTypes.ts"),
+        //     "@/Live2DModel": path.resolve(__dirname, "/node_modules/pixi-live2d-display/src/Live2DModel.ts"), //import文で指定できる
+        //     //     //Mymodule: path.resolve(__dirname, "./src/indexApp/myTypes.ts"),
         // },
     },
 

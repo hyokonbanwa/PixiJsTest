@@ -37,7 +37,7 @@
         "bootstrap": "^5.1.3",
         "htmlspecialchars": "^1.0.5",
         "pixi-live2d-display": "^0.3.1",
-        "pixi.js": "^5.3.6"
+        "pixi.js": "^5.3.11"
     },
     "name": "interactivevalueandcubism",
     "description": "TypeScript で実装したアプリケーションのサンプル実装です。",
