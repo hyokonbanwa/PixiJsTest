@@ -57,6 +57,11 @@ export class MyCanvas {
         stage.addChild(this.hiyori.container);
         this.hiyori.maskRentagle(150, 50, 300, 350);
         hiyoriModel.position.set(400, 100);
+        hiyoriModel.interactive = true;
+        hiyoriModel.on("pointertap", (e: any) => {
+            console.log("クリック");
+            console.log(e);
+        });
         console.log(hiyoriModel.position);
         // const mask = new PIXI.Graphics();
         // mask.beginFill(0xffffff, 1);

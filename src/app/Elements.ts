@@ -7,7 +7,7 @@ export class MyLive2dModel {
     //public frameContainer: PIXI.Container;
     public container: PIXI.Container;
     public model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null;
-    private modelBox: PIXI.Graphics;
+    public modelBox: PIXI.Graphics;
     private boxWidth: number;
     private boxHeight: number;
     private isFilter: boolean;
@@ -89,6 +89,7 @@ export class MyLive2dModel {
 
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
+        //見えなくなるだけで当たり判定は存在している
         // this.container.filters = [new PIXI.filters.AlphaFilter(1)];
         // this.container.filterArea = new PIXI.Rectangle(0, 0, this.boxWidth, this.boxHeight / 2);
         this.container.addChild(this.model);
