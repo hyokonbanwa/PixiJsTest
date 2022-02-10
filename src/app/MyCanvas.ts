@@ -40,10 +40,11 @@ export class MyCanvas {
             width: 1000,
             height: 1000,
             view: document.getElementById("myCanvas") as HTMLCanvasElement,
+            backgroundColor: 0x990000,
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 500, 800);
+        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 600, 800);
         this.initialize();
     }
     //ロード処理と初期配置を書く
@@ -52,12 +53,34 @@ export class MyCanvas {
         const hiyoriModel = this.hiyori.container;
         const stage = this.app.stage;
         //hiyoriModel?.position.set(500, 500);
-        stage.addChild(hiyoriModel as PIXI.Sprite);
+        stage.addChild(hiyoriModel);
         stage.addChild(this.hiyori.container);
-        hiyoriModel.position.set(100, 100);
+        this.hiyori.maskRentagle(150, 50, 300, 350);
+        hiyoriModel.position.set(400, 100);
+        console.log(hiyoriModel.position);
+        // const mask = new PIXI.Graphics();
+        // mask.beginFill(0xffffff, 1);
+        // mask.drawRect(0, 0, 600, 400);
+        // //mask.position.y = 300;
+        // hiyoriModel.mask = mask;
+        // const mask = new PIXI.Graphics();
+        // mask.beginFill(0xffffff, 1);
+        // mask.drawRect(0, 0, 500, 400);
+        // mask.position.y = 400;
+        // //mask.y = 200;
+        // mask.endFill();
+        // // stage.addChild(mask);
+        // // if (this.hiyori.model) {
+        // //     this.hiyori.container.mask = mask;
+        // // }
+
+        // hiyoriModel.addChild(mask);
+        // this.hiyori.container.filters = [new PIXI.filters.AlphaFilter(1)];
+        // this.hiyori.container.filterArea = new PIXI.Rectangle(0, 0, 500, 400); //<-- its SCREEN coords,you have to  calculate the part of screen that must be drawn
         this.addUpdate();
         // const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
         // this.app.stage.addChild(food);
+        // food.position.set(450, 450);
         // const modelOptions: PIXILive2D.Live2DFactoryOptions = {
         //     autoUpdate: false,
         // };
