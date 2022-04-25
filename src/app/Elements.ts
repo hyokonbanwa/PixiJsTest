@@ -7,124 +7,164 @@ export class MyLive2dModel {
     //public frameContainer: PIXI.Container;
     public container: PIXI.Container;
     public model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null;
+    private modelHitArea: HitAreaFrames | PIXI.Graphics;
     public modelBox: PIXI.Graphics;
     private boxWidth: number;
     private boxHeight: number;
-    private isFilter: boolean;
-    private filterX: number | null;
-    private filterY: number | null;
-    private filterWidth: number | null;
-    private filterHeight: number | null;
+    private modelScale: number;
+    private modelX: number;
+    private modelY: number;
+    private isMouseOn: boolean;
 
-    constructor(modelPath: string, modelWidth: number, modelHeight: number) {
+    constructor(modelPath: string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         this.modelPath = modelPath;
-        this.boxWidth = modelWidth;
-        this.boxHeight = modelHeight;
-
-        this.isFilter = false;
-        this.filterX = null;
-        this.filterY = null;
-        this.filterWidth = null;
-        this.filterHeight = null;
+        this.boxWidth = boxWidth;
+        this.boxHeight = boxHeight;
+        // let model: PIXILive2D.Live2DModel;
+        // model.on = (await PIXILive2D.Live2DModel.from(this.modelPath))
+        this.modelScale = modelScale ?? 1;
+        this.modelX = modelX ?? 0;
+        this.modelY = modelY ?? 0;
 
         this.model = null;
+        this.modelHitArea = new HitAreaFrames();
         this.modelBox = new PIXI.Graphics();
         this.container = new PIXI.Container();
+        this.modelBox.lineStyle(2, 0xff).beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill().lineStyle();
         this.container.addChild(this.modelBox);
-        //this.frameContainer = new PIXI.Container();
-        //this.frameContainer.addChild(this.container);
+        this.isMouseOn = false;
     }
     async makeModel() {
         const modelOptions: PIXILive2D.Live2DFactoryOptions = {
             autoUpdate: false,
+            autoInteract: true,
+            idleMotionGroup: "Idle",
         };
         this.model = (await PIXILive2D.Live2DModel.from(this.modelPath, modelOptions)) as unknown as PIXI.Sprite & PIXILive2D.Live2DModel;
         this.model.anchor.set(0.5, 0.5);
-        //const x = await PIXILive2D.Live2DModel.from(this.modelPath, modelOptions);
-        // model.x = 500;
-        // model.y = 500;
-        let modelScale: number = 1;
-
+        this.model.scale.set(this.modelScale, this.modelScale);
+        console.log(this.modelX, this.modelY);
+        //this.model.position.set(this.modelX, this.modelY);
+        this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
         console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
-        //model.widthは更新すると書き変わる scaleの基準は最初にロードしたときのもの
-        if (this.model.height > this.boxHeight) {
-            modelScale = this.boxHeight / this.model.height;
-            this.model.scale.set(modelScale, modelScale);
-            if (this.model.width > this.boxWidth) {
-                modelScale = modelScale * (this.boxWidth / this.model.width);
-                this.model.scale.set(modelScale, modelScale);
-            }
-        } else {
-            modelScale = this.boxWidth / this.model.width;
-            this.model.scale.set(modelScale, modelScale);
-            if (this.model.width > this.boxHeight) {
-                modelScale = modelScale * (this.boxHeight / this.model.height);
-                this.model.scale.set(modelScale, modelScale);
-            }
-        }
-        //const hitAreaFrames = new HitAreaFrames();
-        this.modelBox.lineStyle(2, 0xff).beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill().lineStyle();
-        // const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
-        // food.position.y = 0;
-
-        // const mask2 = new PIXI.Graphics();
-        // mask2.beginFill(0xffffff, 1);
-        // mask2.drawRect(100, 0, 100, 800);
-        // //mask.y = 200;
-        // mask2.endFill();
-        //mask.position.y = 300;
-
-        //this.model.mask = mask;
-
-        //this.model.addChild(hitAreaFrames as unknown as PIXI.Graphics);
-
-        //this.model.mask = mask;
-        //this.container.mask = mask;
-        //console.log(this.model.isMask);
-        //this.container.mask = mask2;
-
-        //this.container.mask = mask;
-        //food.mask = mask;
-        //console.log(this.model.isMask);
-
-        //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
-        //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
-        //見えなくなるだけで当たり判定は存在している
-        // this.container.filters = [new PIXI.filters.AlphaFilter(1)];
-        // this.container.filterArea = new PIXI.Rectangle(0, 0, this.boxWidth, this.boxHeight / 2);
+        this.modelHitArea.visible = false;
+        this.model?.addChild(this.modelHitArea);
         this.container.addChild(this.model);
-        //this.container.addChild(food);
-        this.model.position.set(this.boxWidth / 2, this.boxHeight / 2);
+
+        this.isMouseOn = false;
+        this.container.interactive = true;
+
+        this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
+            const position = e.data.getLocalPosition(e.currentTarget);
+            // console.log(position);
+            // console.log(this.boxWidth, this.boxHeight);
+            if (this.model !== null) {
+                if (this.onModelBox(position) === true) {
+                    this.model.buttonMode = true;
+                    //console.log("乗った");
+                    this.isMouseOn = true;
+                } else {
+                    this.model.buttonMode = false;
+                    //console.log("離れた");
+                    this.isMouseOn = false;
+                }
+            }
+        });
+
+        this.model.interactive = true;
+        this.model.on("hit", (hitAreaNames: Array<String>) => {
+            if (hitAreaNames.includes("Body") === true && this.isMouseOn === true && this.model !== null) {
+                console.log("モデルタップ2");
+                this.model.motion("TapBody", undefined, PIXILive2D.MotionPriority.FORCE);
+
+                // the body is hit
+            }
+        });
+
+        // const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
+        // console.log(coreModel);
+        // const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
+        // console.log(motionManager.update);
+        // coreModel.addParameterValueById("ParamMouthOpenY", 1, 0.8);
+        // const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
+        // const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
+        // console.log(motionManager.update);
+        // console.log(this.model.update);
+        // motionManager.update = (...args): boolean => {
+        //     coreModel.addParameterValueById("ParamMouthOpenY", 0.1, 0.8);
+        //     return true;
+        // };
+
+        //         //マスクテスト
+        //         const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
+        //         this.container.addChild(food);
+        //         const mask2 = new PIXI.Graphics();
+        //         mask2.beginFill(0xffffff, 1).drawRect(0, 0, 100, 100).endFill();
+        //         food.addChild(mask2); //マスクが追従する
+        //         food.mask = mask2;
+        //         food.y = 50;
+        //         console.log(food.isMask);
+
+        //         const mask = new PIXI.Graphics();
+        //         mask.beginFill(0xffffff, 1).drawRect(0, 0, 1000, 1000).endFill();
+        //         console.log(mask.position.x, mask.position.y);
+        //         const mask3 = mask.clone();
+
+        //         this.model.addChild(mask);
+        //         mask.position.set(this.model.width, this.model.height);
+        //         console.log(mask.position.x, mask.position.y);
+        //         //this.model.mask = mask;
+        //         console.log(this.model.isMask);
+        //         //this.model.addChild(mask3);
+        //         //mask3.position.set(this.model.width, this.model.height);
+        //         console.log(mask3.position.x, mask3.position.y);
     }
-
-    //モデルを格納しているcontainerの左上頂点を基準点として描画したいエリアのx,y,width,heightを指定する
-    maskRentagle = (x: number, y: number, width: number, height: number) => {
-        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
-        const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-        this.container.filterArea = new PIXI.Rectangle(containerGlobal.x + x, containerGlobal.y + y, width, height);
-        this.filterX = x;
-        this.filterY = y;
-        this.filterWidth = width;
-        this.filterHeight = height;
-        this.isFilter = true;
-    };
-
     update = (deltaFrame: number) => {
         if (this.model != null) {
+            // const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
+            // console.log(motionManager.groups);
             const frameRate = 60 / deltaFrame; //フレームレートを求める
             const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
-            this.model?.update(elapsedMs);
-            // console.log("位置");
-            // console.log(elapsedMs);
-            if (this.isFilter === true && this.filterX != null && this.filterY != null && this.filterWidth != null && this.filterHeight != null) {
-                const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
 
-                // console.log(this.container.position);
-                // console.log(containerGlobal);
-                this.container.filterArea = new PIXI.Rectangle(containerGlobal.x + this.filterX, containerGlobal.y + this.filterY, this.filterWidth, this.filterHeight);
+            const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
+            this.model?.update(elapsedMs);
+            console.log(coreModel.getParameterValueById("ParamMouthOpenY"));
+            //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
+            //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
+            //見えなくなるだけで当たり判定は存在している
+            this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+            const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+            this.container.filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+            if (this.isMouseOn === false) {
+                const modelGlobal: PIXI.Point = this.model.getGlobalPosition();
+                this.model.focus(modelGlobal.x, modelGlobal.y);
             }
         } else {
             console.log("nullモデルアップデート");
+        }
+    };
+    hitAreaOn = () => {
+        this.modelHitArea.visible = true;
+    };
+    hitAreaOff = () => {
+        this.modelHitArea.visible = false;
+    };
+    //モデルを格納しているcontainerの左上頂点を基準点として描画したいエリアのx,y,width,heightを指定する
+    // maskRentagle = () => {
+    //     this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+    //     const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+    //     this.container.filterArea = new PIXI.Rectangle(containerGlobal.x + x, containerGlobal.y + y, width, height);
+    //     this.filterX = this.container.x;
+    //     this.filterY = this.container.y;
+    //     this.filterWidth = width;
+    //     this.filterHeight = height;
+    //     this.isFilter = true;
+    // };
+    onModelBox = (point: PIXI.Point): boolean => {
+        if (point.x >= 0 && point.y >= 0 && point.x <= this.boxWidth && point.y <= this.boxHeight) {
+            return true;
+        } else {
+            return false;
         }
     };
 }
