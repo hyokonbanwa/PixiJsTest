@@ -44,24 +44,22 @@ export class MyCanvas {
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 500, 500, 0.3, 0, 300);
+        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 500, 800, 0.2, 0, 0);
         this.initialize();
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
         await this.hiyori.makeModel();
         const hiyoriModel = this.hiyori.getContainer();
-        // hiyoriModel.pivot()
-        // hiyoriModel.pivot(hiyoriModel.width/2,hiyoriModel.height/2)
-        hiyoriModel.x = 250;
-        hiyoriModel.y = 100;
+        hiyoriModel.pivot.set(this.hiyori.getWidth() / 2, this.hiyori.getHeight() / 2);
+        hiyoriModel.x = 500;
+        hiyoriModel.y = 500;
         const stage = this.app.stage;
         stage.addChild(hiyoriModel);
         stage.addChild(hiyoriModel);
         this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
         //this.hiyori.hitAreaOff();
-        console.log(hiyoriModel.position);
         this.addUpdate();
 
         //const widget = new PIXI.

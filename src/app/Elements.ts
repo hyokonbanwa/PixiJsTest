@@ -14,7 +14,8 @@ export class MyLive2dModel {
     private modelScale: number;
     private modelX: number;
     private modelY: number;
-    private isMouseOn: boolean;
+    private isBoxOn: boolean; //エージェントの箱の上に乗っているか＝視線追従の基準、モデルタップの前提条件
+    private isHit: boolean; //モデルとマウスの当たり判定が生じているかどうか＝hitイベントの時の発火基準
     private speakSpeed: number;
     private speaking: boolean;
 
@@ -37,7 +38,9 @@ export class MyLive2dModel {
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.alpha = 0;
         this.container.addChild(this.modelBox);
-        this.isMouseOn = false;
+        this.isBoxOn = false;
+        this.isHit = false;
+
         this.speakSpeed = 0;
         this.speaking = false;
     }
@@ -51,7 +54,7 @@ export class MyLive2dModel {
         this.model = (await PIXILive2D.Live2DModel.from(this.modelPath, modelOptions)) as unknown as PIXI.Sprite & PIXILive2D.Live2DModel;
         this.model.anchor.set(0.5, 0.5);
         this.model.scale.set(this.modelScale, this.modelScale);
-        console.log(this.modelX, this.modelY);
+        //console.log(this.modelX, this.modelY);
         //this.model.position.set(this.modelX, this.modelY);
         this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
         console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
@@ -60,7 +63,6 @@ export class MyLive2dModel {
         this.container.addChild(this.model);
 
         //modelBoxにマウスが収まっていた時にonModelBox = trueとする
-        this.isMouseOn = false;
         this.container.interactive = true;
         this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
             // e.stopPropagation();
@@ -70,14 +72,24 @@ export class MyLive2dModel {
             // console.log(position);
             // console.log(this.boxWidth, this.boxHeight);
             if (this.model !== null) {
-                if (this.onModelBox(localPosition) === true && this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
-                    this.model.buttonMode = true;
-                    //console.log("乗った");
-                    this.isMouseOn = true;
+                if (this.onModelBox(localPosition) === true) {
+                    this.isBoxOn = true;
+                    //hitTestの帰り値は配列
+                    if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
+                        //当たったエリアの配列が帰ってくる
+                        //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
+                        this.isHit = true;
+                        this.model.buttonMode = true;
+                        //console.log("乗った");
+                    } else {
+                        this.isHit = false;
+                        this.model.buttonMode = false;
+                    }
                 } else {
+                    this.isHit = false;
                     this.model.buttonMode = false;
                     //console.log("離れた");
-                    this.isMouseOn = false;
+                    this.isBoxOn = false;
                 }
             }
         });
@@ -85,7 +97,7 @@ export class MyLive2dModel {
         //モデルをタップした時の反応調整
         this.model.interactive = true;
         this.model.on("hit", (hitAreaNames: Array<String>) => {
-            if (hitAreaNames.includes("Body") === true && this.isMouseOn === true && this.model !== null) {
+            if (hitAreaNames.includes("Body") === true && this.isHit === true && this.model !== null) {
                 console.log("モデルタップ2");
                 this.model.motion("TapBody", undefined, PIXILive2D.MotionPriority.FORCE);
 
@@ -191,8 +203,8 @@ export class MyLive2dModel {
             //見えなくなるだけで当たり判定は存在している
             this.container.filters = [new PIXI.filters.AlphaFilter(1)];
             const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-            this.container.filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
-            if (this.isMouseOn === false) {
+            this.container.filterArea = new PIXI.Rectangle(containerGlobal.x - this.container.pivot.x, containerGlobal.y - this.container.pivot.y, this.boxWidth, this.boxHeight);
+            if (this.isBoxOn === false) {
                 const modelGlobal: PIXI.Point = this.model.getGlobalPosition();
                 this.model.focus(modelGlobal.x, modelGlobal.y);
             }
@@ -208,6 +220,12 @@ export class MyLive2dModel {
     };
     getContainer = (): PIXI.Container => {
         return this.container;
+    };
+    getWidth = (): number => {
+        return this.boxWidth;
+    };
+    getHeight = (): number => {
+        return this.boxHeight;
     };
     displayBox = () => {
         this.modelBox.alpha = 1;
