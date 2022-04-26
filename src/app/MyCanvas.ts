@@ -29,7 +29,7 @@ type IApplicationOptions = {
 
 export class MyCanvas {
     private app: PIXI.Application;
-    private hiyori: MyLive2dModel;
+    public hiyori: MyLive2dModel;
     //使うものを列挙する
     constructor() {
         //window.PIXI = PIXI;
@@ -44,26 +44,27 @@ export class MyCanvas {
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 600, 800, 0.3, 0, 200);
+        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 500, 500, 0.3, 0, 300);
         this.initialize();
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
         await this.hiyori.makeModel();
-        const hiyoriModel = this.hiyori.container;
-        hiyoriModel.x = 100;
+        const hiyoriModel = this.hiyori.getContainer();
+        // hiyoriModel.pivot()
+        // hiyoriModel.pivot(hiyoriModel.width/2,hiyoriModel.height/2)
+        hiyoriModel.x = 250;
+        hiyoriModel.y = 100;
         const stage = this.app.stage;
         stage.addChild(hiyoriModel);
-        stage.addChild(this.hiyori.container);
-        // hiyoriModel.interactive = true;
-        // hiyoriModel.on("pointertap", (e: any) => {
-        //     console.log("クリック");
-        //     console.log(e);
-        // });
+        stage.addChild(hiyoriModel);
+        this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
         //this.hiyori.hitAreaOff();
         console.log(hiyoriModel.position);
         this.addUpdate();
+
+        //const widget = new PIXI.
         // const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
         // this.app.stage.addChild(food);
         // food.position.set(450, 450);

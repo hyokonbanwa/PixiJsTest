@@ -35,6 +35,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const HtmlWebpackHarddiskPlugin = require("html-webpack-harddisk-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
+//const webpack = require("webpack");
 //const { CleanWebpackPlugin } = require("clean-webpack-plugin");//Webpack5では要らない代わりにoutput.clean = true を使う
 
 // [定数] webpack の出力オプションを指定します
@@ -47,7 +48,7 @@ let enableDevTool;
 let publicPath;
 if (MODE === "development") {
     enableDevTool = "inline-source-map";
-    publicPath = "./";
+    publicPath = "/";
 } else {
     enableDevTool = false;
     publicPath = undefined;
@@ -261,6 +262,7 @@ const app = {
 
         //dist内の余計なファイルを除去する
         //new CleanWebpackPlugin(),
+        //new webpack.HotModuleReplacementPlugin(),
     ],
 
     resolve: {
@@ -287,7 +289,15 @@ const app = {
         open: "/", //"/index.html", //true,
         static: {
             directory: path.join(__dirname, "dist"), //サーバーのルートディレクトリ「ルート/dist/」となる
+
+            //ホットリロード有効化
+            //outputのpathとdevServerのcontentBaseを同じにする
+            //outputのpublicPathとdevServerのpublicPathを同じにする
+            //https://zukucode.com/2017/04/vue-webpack-hmr.html#:~:text=output%E3%81%AEpath%E3%81%A8devServer,publicPath%E3%82%92%E5%90%8C%E3%81%98%E3%81%AB%E3%81%99%E3%82%8B
+            publicPath: publicPath,
         },
+        hot: true,
+
         //host: "0.0.0.0",
 
         /*         static: [
@@ -302,16 +312,16 @@ const app = {
          ], */
 
         //https://webpack.js.org/configuration/dev-server/#websocketurl
-        client: {
-            webSocketURL: {
-                hostname: "0.0.0.0",
-                pathname: "/ws",
-                password: "dev-server",
-                port: 8080,
-                protocol: "ws",
-                username: "webpack",
-            },
-        },
+        // client: {
+        //     webSocketURL: {
+        //         hostname: "0.0.0.0",
+        //         pathname: "/ws",
+        //         password: "dev-server",
+        //         port: 8080,
+        //         protocol: "ws",
+        //         username: "webpack",
+        //     },
+        // },
     },
 
     // //https://webpack.js.org/configuration/dev-server/#websocketurl
