@@ -1,9 +1,13 @@
 import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
+import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
 
 //model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
-export class MyLive2dModel {
+//addListnerできるイベントは"modelHit"＝モデルタップ時発火
+//coreModelようにCubismModelのdeclare宣言必須。
+
+export class CustomModel extends EventEmitter {
     private modelPath: string;
     //public frameContainer: PIXI.Container;
     private container: PIXI.Container;
@@ -31,6 +35,7 @@ export class MyLive2dModel {
      * @param {}modelY
      */
     constructor(modelPath: string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
+        super();
         this.modelPath = modelPath;
         this.boxWidth = boxWidth;
         this.boxHeight = boxHeight;
@@ -126,6 +131,7 @@ export class MyLive2dModel {
                             if (hitAreaNames.includes(area) === true) {
                                 console.log("モデルタップ2");
                                 this.model?.motion(area, undefined, PIXILive2D.MotionPriority.FORCE);
+                                this.emit("modelHit");
 
                                 // the body is hit
                             }
@@ -234,6 +240,11 @@ export class MyLive2dModel {
         //         console.log(mask3.position.x, mask3.position.y);
     }
 
+    /**
+     * モデルをデルタフレームでアップデートする関数
+     * pixiアプリのtickerに登録する　{pixiapp}.ticker.add({CustomModel}.update)
+     * @param {number} deltaFrame デルタフレーム
+     */
     update = (deltaFrame: number): void => {
         if (this.model != null) {
             //モデルのアップデート
@@ -271,18 +282,37 @@ export class MyLive2dModel {
     getContainer = (): PIXI.Container => {
         return this.container;
     };
+    /**
+     *
+     * @returns {number} 横幅
+     */
     getWidth = (): number => {
         return this.boxWidth;
     };
+
+    /**
+     *
+     * @returns {number} 縦幅
+     */
     getHeight = (): number => {
         return this.boxHeight;
     };
+
+    /**
+     * モデルの入っている箱を映す
+     */
     displayBox = () => {
         this.modelBox.alpha = 1;
     };
+    /**
+     * モデルの当たり判定エリアをオン
+     */
     hitAreaOn = (): void => {
         this.modelHitArea.visible = true;
     };
+    /**
+     * モデルの当たり判定エリアをオフ
+     */
     hitAreaOff = (): void => {
         this.modelHitArea.visible = false;
     };
@@ -297,6 +327,7 @@ export class MyLive2dModel {
     //     this.filterHeight = height;
     //     this.isFilter = true;
     // };
+
     onModelBox = (point: PIXI.Point): boolean => {
         if (point.x >= 0 && point.y >= 0 && point.x <= this.boxWidth && point.y <= this.boxHeight) {
             return true;
@@ -305,6 +336,10 @@ export class MyLive2dModel {
         }
     };
 
+    /**
+     * 口パク開始
+     * @param {} speakSpeed 口パク速度　2π x speakSpeed
+     */
     startSpeak = (speakSpeed: number): void => {
         if (this.model !== null && speakSpeed >= 0) {
             console.log("口パク開始");
@@ -316,6 +351,9 @@ export class MyLive2dModel {
             console.log("Invalid");
         }
     };
+    /**
+     * 話すのをやめる
+     */
     stopSpeak = (): void => {
         if (this.model !== null) {
             console.log("口パク終了");
@@ -325,6 +363,10 @@ export class MyLive2dModel {
         }
     };
 
+    /**
+     * 表情再生
+     * @param {number | string } id? 表情の番号または名前、指定しない場合ランダム
+     */
     setExpression = (id?: number | string): void => {
         if (this.model !== null) {
             this.model.expression(id);
@@ -333,6 +375,12 @@ export class MyLive2dModel {
         }
     };
 
+    /**
+     * モーション再生
+     * @param {string} group　再生するモーショングループ
+     * @param {number} index? 再生するモーションの番号 指定しない場合ランダム
+     * @param {MotionPriority} priority? 再生するモーションの優先度 指定しない　場合MotionPriority.NORMAL
+     */
     setMotion = (group: string, index?: number, priority?: PIXILive2D.MotionPriority): void => {
         if (this.model !== null) {
             this.model.motion(group, index, priority);

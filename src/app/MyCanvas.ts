@@ -1,7 +1,7 @@
 import * as PIXI from "pixi.js";
-import * as PIXILive2D from "pixi-live2d-display";
-import { MyLive2dModel } from "./Elements";
-import { threadId } from "worker_threads";
+//import * as PIXILive2D from "pixi-live2d-display";
+import { CustomModel } from "./CustomModel";
+//import { threadId } from "worker_threads";
 // declare global {
 //     interface Window {
 //         PIXI: any;
@@ -29,7 +29,7 @@ type IApplicationOptions = {
 
 export class MyCanvas {
     private app: PIXI.Application;
-    public hiyori: MyLive2dModel;
+    public hiyori: CustomModel;
     //使うものを列挙する
     constructor() {
         //window.PIXI = PIXI;
@@ -40,11 +40,11 @@ export class MyCanvas {
             width: 1000,
             height: 1000,
             view: document.getElementById("myCanvas") as HTMLCanvasElement,
-            backgroundColor: 0x990000,
+            backgroundColor: 0x000099,
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new MyLive2dModel("/Resources/Hiyori_2/Hiyori.model3.json", 500, 800, 0.2, 0, 0);
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", 550, 900, 0.235, 0, -20);
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
@@ -58,6 +58,9 @@ export class MyCanvas {
         stage.addChild(hiyoriModel);
         this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
+        this.hiyori.addListener("modelHit", () => {
+            console.log("モデルヒット");
+        });
         //this.hiyori.hitAreaOff();
         this.addUpdate();
 
