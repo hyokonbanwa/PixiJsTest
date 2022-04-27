@@ -2,6 +2,7 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 import { HitAreaFrames } from "./HitAreaFrames";
 
+//model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
 export class MyLive2dModel {
     private modelPath: string;
     //public frameContainer: PIXI.Container;
@@ -11,7 +12,8 @@ export class MyLive2dModel {
     private modelBox: PIXI.Graphics;
     private boxWidth: number;
     private boxHeight: number;
-    private modelScale: number;
+    private modelScale: number; //モデルの拡大率
+    //modelBox中心からどれだけずれるかxyで決める
     private modelX: number;
     private modelY: number;
     private isBoxOn: boolean; //エージェントの箱の上に乗っているか＝視線追従の基準、モデルタップの前提条件
@@ -19,6 +21,15 @@ export class MyLive2dModel {
     private speakSpeed: number;
     private speaking: boolean;
 
+    /**
+     *モデルの設定の初期化
+     * @param {string} modelPath モデルのパス(~~/hoge.model3.json)を指定する
+     * @param {number}boxWidth モデルを入れる箱の横幅
+     * @param {number}boxHeight 縦幅
+     * @param {number}modelScale 箱の中のモデルの拡大率
+     * @param {}modelX 箱の中のモデルが中心から
+     * @param {}modelY
+     */
     constructor(modelPath: string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         this.modelPath = modelPath;
         this.boxWidth = boxWidth;
@@ -44,6 +55,10 @@ export class MyLive2dModel {
         this.speakSpeed = 0;
         this.speaking = false;
     }
+
+    /**
+     * モデルを非同期で生成する関数
+     */
     async makeModel() {
         //モデルの配置
         const modelOptions: PIXILive2D.Live2DFactoryOptions = {
@@ -52,112 +67,139 @@ export class MyLive2dModel {
             idleMotionGroup: "Idle",
         };
         this.model = (await PIXILive2D.Live2DModel.from(this.modelPath, modelOptions)) as unknown as PIXI.Sprite & PIXILive2D.Live2DModel;
-        this.model.anchor.set(0.5, 0.5);
-        this.model.scale.set(this.modelScale, this.modelScale);
-        //console.log(this.modelX, this.modelY);
-        //this.model.position.set(this.modelX, this.modelY);
-        this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
-        console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
-        this.modelHitArea.visible = false;
-        this.model?.addChild(this.modelHitArea);
-        this.container.addChild(this.model);
 
-        //modelBoxにマウスが収まっていた時にonModelBox = trueとする
-        this.container.interactive = true;
-        this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
-            // e.stopPropagation();
-            // e.stopped = true;
-            const localPosition = e.data.getLocalPosition(e.currentTarget);
-            const globalPosition = e.data.global;
-            // console.log(position);
-            // console.log(this.boxWidth, this.boxHeight);
+        const setPosition = () => {
             if (this.model !== null) {
-                if (this.onModelBox(localPosition) === true) {
-                    this.isBoxOn = true;
-                    //hitTestの帰り値は配列
-                    if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
-                        //当たったエリアの配列が帰ってくる
-                        //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
-                        this.isHit = true;
-                        this.model.buttonMode = true;
-                        //console.log("乗った");
-                    } else {
-                        this.isHit = false;
-                        this.model.buttonMode = false;
-                    }
-                } else {
-                    this.isHit = false;
-                    this.model.buttonMode = false;
-                    //console.log("離れた");
-                    this.isBoxOn = false;
-                }
+                this.model.anchor.set(0.5, 0.5);
+                this.model.scale.set(this.modelScale, this.modelScale);
+                //console.log(this.modelX, this.modelY);
+                //this.model.position.set(this.modelX, this.modelY);
+                this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
+                console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
+                this.modelHitArea.visible = false;
+                this.model?.addChild(this.modelHitArea);
+                this.container.addChild(this.model);
             }
-        });
-
-        //モデルをタップした時の反応調整
-        this.model.interactive = true;
-        this.model.on("hit", (hitAreaNames: Array<String>) => {
-            if (hitAreaNames.includes("Body") === true && this.isHit === true && this.model !== null) {
-                console.log("モデルタップ2");
-                this.model.motion("TapBody", undefined, PIXILive2D.MotionPriority.FORCE);
-
-                // the body is hit
-            }
-        });
-
-        //口パクのために live2Dmodel.internalModelのアップデート関数を上書きする
-        //cubisum4InternalModel https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism4/Cubism4InternalModel.ts#L172
-        //internalModel https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism-common/InternalModel.ts#L252
-        const internalModel: PIXILive2D.Cubism4InternalModel = this.model.internalModel as PIXILive2D.Cubism4InternalModel;
-        const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
-        const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
-        internalModel.update = (dt: DOMHighResTimeStamp, now: DOMHighResTimeStamp): void => {
-            //super.update(dt, now);
-            internalModel.focusController.update(dt); //internalModel.update()と同義　インスタンスの親クラスのメソッドを使う方法探す
-
-            // cubism4 uses seconds
-            dt /= 1000;
-            now /= 1000;
-
-            const model = coreModel;
-
-            internalModel.emit("beforeMotionUpdate");
-
-            const motionUpdated = motionManager.update(coreModel, now);
-
-            internalModel.emit("afterMotionUpdate");
-
-            model.saveParameters();
-
-            if (!motionUpdated) {
-                internalModel.eyeBlink?.updateParameters(internalModel.coreModel, dt);
-            }
-
-            internalModel.updateFocus();
-
-            // revert the timestamps to be milliseconds
-            internalModel.updateNaturalMovements(dt * 1000, now * 1000);
-
-            //------------- ここを有効化した
-            //Live2Dmodel.motion()、live2Dmodel.expression()によらないパラメーター操作はここで行う
-            // TODO: Add lip sync API
-            if (internalModel.lipSync === true && this.speaking === true) {
-                const value = Math.abs(Math.sin(2 * Math.PI * this.speakSpeed * now)); // 0 ~ 1
-
-                model.addParameterValueById("ParamMouthOpenY", value, 0.8);
-                //console.log("口："+coreModel.getParameterValueById("ParamMouthOpenY"));
-            }
-            //-----------
-
-            internalModel.physics?.evaluate(internalModel.coreModel, dt);
-            internalModel.pose?.updateParameters(internalModel.coreModel, dt);
-
-            internalModel.emit("beforeModelUpdate");
-
-            model.update();
-            model.loadParameters();
-            //console.log("updateしてる");
         };
+        setPosition();
+
+        const setListener = () => {
+            if (this.model !== null) {
+                //modelBoxにマウスが収まっていた時にonModelBox = trueとする
+                this.container.interactive = true;
+                this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
+                    // e.stopPropagation();
+                    // e.stopped = true;
+                    const localPosition = e.data.getLocalPosition(e.currentTarget);
+                    const globalPosition = e.data.global;
+                    // console.log(position);
+                    // console.log(this.boxWidth, this.boxHeight);
+                    if (this.model !== null) {
+                        if (this.onModelBox(localPosition) === true) {
+                            this.isBoxOn = true;
+                            //hitTestの帰り値は配列
+                            if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
+                                //当たったエリアの配列が帰ってくる
+                                //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
+                                this.isHit = true;
+                                this.model.buttonMode = true;
+                                //console.log("乗った");
+                            } else {
+                                this.isHit = false;
+                                this.model.buttonMode = false;
+                            }
+                        } else {
+                            this.isHit = false;
+                            this.model.buttonMode = false;
+                            //console.log("離れた");
+                            this.isBoxOn = false;
+                        }
+                    }
+                });
+                //モデルをタップした時の反応調整
+                this.model.interactive = true;
+                this.model.on("hit", (hitAreaNames: Array<String>) => {
+                    if (this.model !== null && this.isHit === true) {
+                        //それぞれのエリアごとに当たり判定を見ていく
+                        Object.keys(this.model.internalModel.hitAreas).forEach((area: string) => {
+                            console.log(area);
+                            if (hitAreaNames.includes(area) === true) {
+                                console.log("モデルタップ2");
+                                this.model?.motion(area, undefined, PIXILive2D.MotionPriority.FORCE);
+
+                                // the body is hit
+                            }
+                        });
+                    }
+                });
+            }
+        };
+        setListener();
+
+        const customModelUpdate = () => {
+            if (this.model !== null) {
+                //口パクのために live2Dmodel.internalModelのアップデート関数を上書きする
+                //cubisum4InternalModel https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism4/Cubism4InternalModel.ts#L172
+                //internalModel https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism-common/InternalModel.ts#L252
+                const internalModel: PIXILive2D.Cubism4InternalModel = this.model.internalModel as PIXILive2D.Cubism4InternalModel;
+                const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
+                const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
+                internalModel.update = (dt: DOMHighResTimeStamp, now: DOMHighResTimeStamp): void => {
+                    //super.update(dt, now);
+                    internalModel.focusController.update(dt); //internalModel.update()と同義　インスタンスの親クラスのメソッドを使う方法探す
+
+                    // cubism4 uses seconds
+                    dt /= 1000;
+                    now /= 1000;
+
+                    const model = coreModel;
+
+                    internalModel.emit("beforeMotionUpdate");
+
+                    const motionUpdated = motionManager.update(coreModel, now);
+
+                    internalModel.emit("afterMotionUpdate");
+
+                    model.saveParameters();
+
+                    if (!motionUpdated) {
+                        internalModel.eyeBlink?.updateParameters(internalModel.coreModel, dt);
+                    }
+
+                    internalModel.updateFocus();
+
+                    // revert the timestamps to be milliseconds
+                    internalModel.updateNaturalMovements(dt * 1000, now * 1000);
+
+                    //------------- ここを有効化した
+                    //Live2Dmodel.motion()、live2Dmodel.expression()によらないパラメーター操作はここで行う
+                    // TODO: Add lip sync API
+                    if (internalModel.lipSync === true && this.speaking === true) {
+                        const value = Math.abs(Math.sin(2 * Math.PI * this.speakSpeed * now)); // 0 ~ 1
+
+                        model.addParameterValueById("ParamMouthOpenY", value, 0.8);
+                        //console.log("口："+coreModel.getParameterValueById("ParamMouthOpenY"));
+                    }
+                    //-----------
+
+                    internalModel.physics?.evaluate(internalModel.coreModel, dt);
+                    internalModel.pose?.updateParameters(internalModel.coreModel, dt);
+
+                    internalModel.emit("beforeModelUpdate");
+
+                    model.update();
+                    model.loadParameters();
+                    //console.log("updateしてる");
+                };
+            }
+        };
+        customModelUpdate();
+
+        // this.model.expression(1);
+        // this.model.expression("angry1"); //jsonのExpressions.Nameを参照する
+        //this.model.expression();
+        //console.log(this.model.internalModel.settings);
+        //this.model.internalModel.motionManager.groups.idle = "";
 
         // const motionManager: PIXILive2D.MotionManager = this.model.internalModel.motionManager;
         // console.log(motionManager.update);
@@ -191,6 +233,7 @@ export class MyLive2dModel {
         //         //mask3.position.set(this.model.width, this.model.height);
         //         console.log(mask3.position.x, mask3.position.y);
     }
+
     update = (deltaFrame: number): void => {
         if (this.model != null) {
             //モデルのアップデート
@@ -214,10 +257,17 @@ export class MyLive2dModel {
 
             //現在のモーションの詳細 https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism-common/MotionManager.ts#:~:text=state%20%3D%20new%20MotionState()%3B
             //console.log(this.model.internalModel.motionManager.state);
+
+            //現在の表情を特定する方法は不明
+            //console.log(this.model.internalModel.motionManager.expressionManager?.expressions);
         } else {
             console.log("nullモデルアップデート");
         }
     };
+    /**
+     * 移動させたいときはこのメソッドでコンテナを取得して、それを動かす
+     * @returns {PIXI.Container} モデルの入った箱を返す。
+     */
     getContainer = (): PIXI.Container => {
         return this.container;
     };
@@ -263,7 +313,7 @@ export class MyLive2dModel {
             this.model.motion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
             this.model.internalModel.motionManager.groups.idle = "StartSpeak";
         } else {
-            console.log("Invalid Speak Speed");
+            console.log("Invalid");
         }
     };
     stopSpeak = (): void => {
@@ -272,6 +322,22 @@ export class MyLive2dModel {
             this.speaking = false;
             this.speakSpeed = 0;
             this.model.internalModel.motionManager.groups.idle = "Idle";
+        }
+    };
+
+    setExpression = (id?: number | string): void => {
+        if (this.model !== null) {
+            this.model.expression(id);
+        } else {
+            console.log("Invalid");
+        }
+    };
+
+    setMotion = (group: string, index?: number, priority?: PIXILive2D.MotionPriority): void => {
+        if (this.model !== null) {
+            this.model.motion(group, index, priority);
+        } else {
+            console.log("Invalid");
         }
     };
 }

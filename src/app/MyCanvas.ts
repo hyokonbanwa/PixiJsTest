@@ -44,8 +44,7 @@ export class MyCanvas {
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new MyLive2dModel("/Resources/Hiyori/Hiyori.model3.json", 500, 800, 0.2, 0, 0);
-        this.initialize();
+        this.hiyori = new MyLive2dModel("/Resources/Hiyori_2/Hiyori.model3.json", 500, 800, 0.2, 0, 0);
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
