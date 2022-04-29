@@ -39,7 +39,8 @@
         "eventemitter3": "^4.0.7",
         "htmlspecialchars": "^1.0.5",
         "pixi-live2d-display": "^0.3.1",
-        "pixi.js": "^5.3.11"
+        "pixi.js": "^5.3.11",
+        "voicevox-api-client": "^1.0.0"
     },
     "name": "interactivevalueandcubism",
     "description": "TypeScript で実装したアプリケーションのサンプル実装です。",

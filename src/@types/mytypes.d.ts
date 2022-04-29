@@ -2,6 +2,15 @@
 // declare interface Window {
 //     PIXI: PIXI;
 // }
+
+interface Window {
+    webkitAudioContext: typeof AudioContext;
+}
+interface OscillatorNode {
+    noteOn(): (when?: number) => void;
+    noteOff(): (when?: number) => void;
+}
+
 declare class MyCubismModel {
     /**
      * モデルのパラメータの更新

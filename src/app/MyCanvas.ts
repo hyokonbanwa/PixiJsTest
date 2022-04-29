@@ -1,6 +1,7 @@
 import * as PIXI from "pixi.js";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
+import { VOICEVOXVoice } from "./VOICEVOXVoice";
 //import { threadId } from "worker_threads";
 // declare global {
 //     interface Window {
@@ -44,7 +45,8 @@ export class MyCanvas {
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", 550, 900, 0.235, 0, -20);
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 900, 0.4, 0, 400); //550, 900, 0.235, 0, -20
+        this.hiyori.setVOICEVOXvoice(new VOICEVOXVoice("http://localhost:40080", new AudioContext()));
     }
     //ロード処理と初期配置を書く
     initialize = async () => {

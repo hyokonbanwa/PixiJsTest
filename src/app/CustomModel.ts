@@ -2,6 +2,13 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
+import { VOICEVOXVoice } from "./VOICEVOXVoice";
+
+/**
+ * ToDo
+ * 回転に対応
+ * 任意の図形で切り抜けるようにする
+ **/
 
 //model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
 //addListnerできるイベントは"modelHit"＝モデルタップ時発火
@@ -22,8 +29,16 @@ export class CustomModel extends EventEmitter {
     private modelY: number;
     private isBoxOn: boolean; //エージェントの箱の上に乗っているか＝視線追従の基準、モデルタップの前提条件
     private isHit: boolean; //モデルとマウスの当たり判定が生じているかどうか＝hitイベントの時の発火基準
-    private speakSpeed: number;
+
     private speaking: boolean;
+    private speakSpeed: number;
+
+    private voicing: boolean;
+    private volume: number;
+
+    private audio: VOICEVOXVoice | null;
+    private currentExpression: number | null;
+    private normalExpressionIndex: number | string;
 
     /**
      *モデルの設定の初期化
@@ -34,7 +49,7 @@ export class CustomModel extends EventEmitter {
      * @param {}modelX 箱の中のモデルが中心から
      * @param {}modelY
      */
-    constructor(modelPath: string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
+    constructor(modelPath: string, normalExpressionIndex: number | string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         super();
         this.modelPath = modelPath;
         this.boxWidth = boxWidth;
@@ -59,6 +74,13 @@ export class CustomModel extends EventEmitter {
 
         this.speakSpeed = 0;
         this.speaking = false;
+        this.voicing = false;
+        this.volume = 0;
+        this.audio = null;
+
+        this.currentExpression = null;
+
+        this.normalExpressionIndex = normalExpressionIndex;
     }
 
     /**
@@ -181,10 +203,15 @@ export class CustomModel extends EventEmitter {
                     //Live2Dmodel.motion()、live2Dmodel.expression()によらないパラメーター操作はここで行う
                     // TODO: Add lip sync API
                     if (internalModel.lipSync === true && this.speaking === true) {
+                        //console.log("口パク中");
                         const value = Math.abs(Math.sin(2 * Math.PI * this.speakSpeed * now)); // 0 ~ 1
 
                         model.addParameterValueById("ParamMouthOpenY", value, 0.8);
                         //console.log("口："+coreModel.getParameterValueById("ParamMouthOpenY"));
+                    }
+                    if (internalModel.lipSync === true && this.voicing === true) {
+                        //console.log("発話中");
+                        model.addParameterValueById("ParamMouthOpenY", this.volume, 0.9);
                     }
                     //-----------
 
@@ -341,35 +368,63 @@ export class CustomModel extends EventEmitter {
      * @param {} speakSpeed 口パク速度　2π x speakSpeed
      */
     startSpeak = (speakSpeed: number): void => {
-        if (this.model !== null && speakSpeed >= 0) {
-            console.log("口パク開始");
-            this.speaking = true;
-            this.speakSpeed = speakSpeed;
-            this.model.motion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
-            this.model.internalModel.motionManager.groups.idle = "StartSpeak";
-        } else {
-            console.log("Invalid");
-        }
+        if (this.model === null || speakSpeed < 0) return;
+
+        this.stopSpeak();
+        this.speaking = true;
+        console.log("口パク開始");
+
+        this.speakSpeed = speakSpeed;
+        this.setMotion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+        this.model.internalModel.motionManager.groups.idle = "StartSpeak";
     };
+
+    //     /**
+    //  * 口パク開始
+    //  * @param {} speakSpeed 口パク速度　2π x speakSpeed
+    //  */
+    //      startSpeak = (speakSpeed: number, volume?: number): void => {
+    //         if (this.model === null || speakSpeed < 0) return;
+
+    //         if (volume === void 0) {
+    //             console.log("口パク開始");
+    //             this.speaking = true;
+    //             this.speakSpeed = speakSpeed;
+    //             this.model.motion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+    //             this.model.internalModel.motionManager.groups.idle = "StartSpeak";
+    //         } else {
+    //             console.log("口パク開始");
+    //             this.speaking = true;
+    //             this.speakSpeed = speakSpeed;
+    //             this.model.motion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+    //             this.model.internalModel.motionManager.groups.idle = "StartSpeak";
+    //         }
+    //     };
     /**
      * 話すのをやめる
      */
     stopSpeak = (): void => {
-        if (this.model !== null) {
-            console.log("口パク終了");
-            this.speaking = false;
-            this.speakSpeed = 0;
-            this.model.internalModel.motionManager.groups.idle = "Idle";
+        if (this.model === null) return console.log("モデルがないです");
+        console.log("口パク終了");
+        //前の音を止める
+        if (this.audio !== null) {
+            this.audio.stopVoice();
         }
+        this.speaking = false;
+        this.voicing = false;
+        this.speakSpeed = 0;
+        this.volume = 0;
+        this.model.internalModel.motionManager.groups.idle = "Idle";
     };
 
     /**
      * 表情再生
      * @param {number | string } id? 表情の番号または名前、指定しない場合ランダム
      */
-    setExpression = (id?: number | string): void => {
+    setExpression = (id: number): void => {
         if (this.model !== null) {
             this.model.expression(id);
+            this.currentExpression = id;
         } else {
             console.log("Invalid");
         }
@@ -377,15 +432,52 @@ export class CustomModel extends EventEmitter {
 
     /**
      * モーション再生
+     * このクラスでも必ずこれを使う
      * @param {string} group　再生するモーショングループ
      * @param {number} index? 再生するモーションの番号 指定しない場合ランダム
      * @param {MotionPriority} priority? 再生するモーションの優先度 指定しない　場合MotionPriority.NORMAL
      */
     setMotion = (group: string, index?: number, priority?: PIXILive2D.MotionPriority): void => {
         if (this.model !== null) {
-            this.model.motion(group, index, priority);
+            //--------------------------------------------
+            //モデルにモーションを取らせるとき、表情が反映されないときがある
+            //motion()のまえでノーマルの表情に初期化、setTImerで現在の表情をあてはめることで修正できる
+            this.model.expression(this.normalExpressionIndex); //表情リセット
+
+            this.model.motion(group, index, priority); //モーション再生
+
+            window.setTimeout(() => {
+                if (this.currentExpression !== null) {
+                    //時間をおいて現在の表情にする
+                    this.setExpression(this.currentExpression);
+                }
+            }, 10);
         } else {
             console.log("Invalid");
         }
+    };
+
+    startVoice = async (speaker: number, text: string, volumeScale?: number) => {
+        if (this.audio === null || this.model === null) return console.log("audioがない");
+        //前の音を止める
+        this.stopSpeak();
+
+        this.voicing = true;
+
+        const audioBuffer: AudioBuffer = await this.audio.createVoice(speaker, text, volumeScale);
+        const setVoiceVolume = (volume: number): void => {
+            this.volume = volume;
+        };
+        this.audio.playVoice(audioBuffer, true, setVoiceVolume, this.audio.stopVoice); //this.stopSpeakを登録しない、endedでspeaking,voicing両方falseになるため
+
+        this.setMotion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+        this.model.internalModel.motionManager.groups.idle = "StartSpeak";
+
+        // window.setTimeout(() => {
+        //     this.setExpression(0);
+        // }, 50);
+    };
+    setVOICEVOXvoice = (audio: VOICEVOXVoice): void => {
+        this.audio = audio;
     };
 }
