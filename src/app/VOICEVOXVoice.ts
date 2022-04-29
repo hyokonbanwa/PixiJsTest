@@ -1,23 +1,25 @@
 import { Client, Query } from "voicevox-api-client";
 export class VOICEVOXVoice {
     private audioSource: AudioBufferSourceNode | null;
-    private isPlaying: boolean;
+    public isPlaying: boolean;
     private intervalID: number | null;
     private client: Client;
     private ctx: AudioContext;
-    constructor(serverAddress: string, ctx: AudioContext) {
+    private startVoiceTime: number;
+    constructor(client: Client, ctx: AudioContext) {
         this.audioSource = null;
         this.isPlaying = false;
         this.intervalID = null;
         this.ctx = ctx;
-        this.client = new Client(serverAddress);
+        this.client = client;
+        this.startVoiceTime = 0;
     }
     //VOICEVOXサーバーにリクエストしてAudioBufferをもらう関数
     createVoice = async (speaker: number, text: string, volumeScale?: number): Promise<AudioBuffer> => {
         const query: Query = await this.client.query.createQuery(speaker, text);
         //query.speedScale = 1.5;
         //query.prePhonemeLength = 0.1;
-        query.postPhonemeLength = 0.5;
+        query.postPhonemeLength = 0.3;
         query.volumeScale = volumeScale ?? 1;
         const voiceArrayBuffer: ArrayBuffer = await this.client.voice.createVoice(speaker, query);
         // Web Audio APIで使える形式に変換
@@ -25,13 +27,16 @@ export class VOICEVOXVoice {
         return voiceAudioBufer;
     };
     // AudioBufferをctxに接続し再生する関数
-    playVoice = (audioBuffer: AudioBuffer, isAnalyzing: boolean, playingCallback?: (currentVolume: number) => void, finishCallback?: () => void) => {
+    playVoice = (audioBuffer: AudioBuffer, isAnalyzing: boolean, playingCallback?: (currentVolume: number) => void, callTimes?: number, finishCallback?: () => void) => {
         //再生中なら停止
         if (this.isPlaying === true && this.intervalID !== null) {
+            this.stopVoice();
             window.clearInterval(this.intervalID);
         }
         //ステータスを再生にする
         this.isPlaying = true;
+
+        callTimes = callTimes ?? 15;
 
         //AudioCOntextで扱うプレイヤー作成
         this.audioSource = this.ctx.createBufferSource();
@@ -41,18 +46,23 @@ export class VOICEVOXVoice {
         //再生終了時にstop()するリスナー登録
         this.audioSource.addEventListener("ended", (e: Event) => {
             if (this.intervalID !== null) {
-                const target: AudioBufferSourceNode = e.target as AudioBufferSourceNode;
+                //const target: AudioBufferSourceNode = e.target as AudioBufferSourceNode;
                 //console.log(e.target);
-                target.stop();
+
                 this.isPlaying = false;
-                window.clearInterval(this.intervalID);
-                if (finishCallback !== void 0) {
-                    finishCallback();
+
+                if (this.audioSource?.buffer) {
+                    if (finishCallback !== void 0 && this.audioSource?.buffer?.duration <= this.ctx.currentTime - this.startVoiceTime) {
+                        finishCallback();
+                    }
                 }
                 console.log("VOIVEVOX再生終了");
+                this.stopVoice();
+                window.clearInterval(this.intervalID);
             }
         });
 
+        this.startVoiceTime = this.ctx.currentTime;
         //解析するなら
         if (isAnalyzing === false) {
             this.audioSource.connect(this.ctx.destination);
@@ -86,7 +96,7 @@ export class VOICEVOXVoice {
                     //コールバックあるなら実行する
                     playingCallback(currentVolume);
                 }
-            }, 1000 / 15);
+            }, 1000 / callTimes);
 
             function normalizeLastVolume(volumes: Uint8Array) {
                 // console.log((times[times.length - 1] - ave) / he);
@@ -107,7 +117,7 @@ export class VOICEVOXVoice {
     };
 
     stopVoice = (): void => {
-        if (this.intervalID === null) return console.log("何も再生していません");
+        if (this.intervalID === null) return console.log("VOICEVOXは何も再生していません");
         this.isPlaying = false;
         this.audioSource?.stop();
         window.clearInterval(this.intervalID);

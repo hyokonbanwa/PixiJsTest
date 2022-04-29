@@ -1,7 +1,9 @@
 import * as PIXI from "pixi.js";
+import * as PIXILive2D from "pixi-live2d-display";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
 import { VOICEVOXVoice } from "./VOICEVOXVoice";
+import { Client } from "voicevox-api-client";
 //import { threadId } from "worker_threads";
 // declare global {
 //     interface Window {
@@ -45,8 +47,12 @@ export class MyCanvas {
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 900, 0.4, 0, 400); //550, 900, 0.235, 0, -20
-        this.hiyori.setVOICEVOXvoice(new VOICEVOXVoice("http://localhost:40080", new AudioContext()));
+
+        //550, 900, 0.235, 0, -20 モデル全身
+        //550, 700, 0.45, 0, 500 モデル顔中心
+
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
+        this.hiyori.setVOICEVOXvoice(new VOICEVOXVoice(new Client("http://localhost:40080"), new AudioContext()));
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
@@ -57,13 +63,56 @@ export class MyCanvas {
         hiyoriModel.y = 500;
         const stage = this.app.stage;
         stage.addChild(hiyoriModel);
-        stage.addChild(hiyoriModel);
         this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
-        this.hiyori.addListener("modelHit", () => {
-            console.log("モデルヒット");
-        });
         //this.hiyori.hitAreaOff();
+
+        this.hiyori.idleGroup = "Idle"; //ひよりの通常時のモーショングループ
+        //モデルをタップした時の動作を追加
+        this.hiyori.onModelHit((hitArea: string) => {
+            //体に当たったときのみ反応
+            if (hitArea === "Body") {
+                //話している最中はタッチに反応しない
+                if (this.hiyori.isSpeaking === false && this.hiyori.isVoicing === false) {
+                    this.hiyori.setMotion(hitArea, undefined, PIXILive2D.MotionPriority.FORCE);
+                    console.log("モデルヒット：" + hitArea);
+                }
+            }
+        });
+
+        //モデルが話始めたときの処理
+        this.hiyori.onStartSpeak(() => {
+            this.hiyori.setMotion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+            this.hiyori.idleGroup = "StartSpeak";
+            console.log("話し始める。");
+        });
+
+        //モデルの口パクボイスを中断したときの処理
+        this.hiyori.onStopSpeak(() => {
+            this.hiyori.idleGroup = "Idle";
+            console.log("お話中断");
+        });
+
+        this.hiyori.onModelUpdate(() => {
+            //console.log(this.hiyori.isBoxOn);
+            //マウスを見るかの調整
+            if (this.hiyori.isBoxOn === false) {
+                this.hiyori.mouseLooking = false;
+            } else {
+                this.hiyori.mouseLooking = true;
+            }
+            //console.log(this.hiyori.isSpeaking, this.hiyori.isVoicing);
+            //console.log(this.hiyori.motionState);
+        });
+
+        this.hiyori.onFinishSpeak(() => {
+            this.hiyori.idleGroup = "Idle";
+            console.log("話し終わった");
+        });
+        this.hiyori.onMotionFinished((currentGroup: string, currentIndex: number) => {
+            console.log(`「${currentGroup}」グループの、「${currentIndex}」番目のモーションが終了`);
+        });
+
         this.addUpdate();
 
         //const widget = new PIXI.
