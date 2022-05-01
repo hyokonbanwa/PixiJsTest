@@ -1,5 +1,5 @@
 import { Client, Query } from "voicevox-api-client";
-export class VOICEVOXVoice {
+export class VOICEVOXAudio {
     private audioSource: AudioBufferSourceNode | null;
     public isPlaying: boolean;
     private intervalID: number | null;
@@ -56,7 +56,7 @@ export class VOICEVOXVoice {
                         finishCallback();
                     }
                 }
-                console.log("VOIVEVOX再生終了");
+                console.log("AudioNodeストップ");
                 this.stopVoice();
                 window.clearInterval(this.intervalID);
             }

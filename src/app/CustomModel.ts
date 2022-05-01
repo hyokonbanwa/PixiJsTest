@@ -2,14 +2,14 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
-import { VOICEVOXVoice } from "./VOICEVOXVoice";
+import { VOICEVOXAudio } from "./VOICEVOXAudio";
 
 /**
  * ToDo
  * 回転に対応
  * 任意の図形で切り抜けるようにする
  **/
-//motionを再生時に(idleも)group 番号を表示
+//欠陥：モーションに一意の番号が無いので、予約再生時にモーションを区別できない よってgithubからソースを持ってきてMotionStateが一意のキーを持てるようにする必要がある
 
 //イベント一覧
 //onModelHitでモデルをクリックしたときの動作を追加できる。
@@ -17,38 +17,47 @@ import { VOICEVOXVoice } from "./VOICEVOXVoice";
 //onStopSpeakでモデルが話し終わる（中断させる）ときの処理を追加できる。
 //onModelUpdateでモデルの毎回のアップデートの処理を追加できる。
 //onFinishSpeakでボイスが最後まで再生されたときの処理を追加できる。
+//onMotionFinishedでモーションが中断されず最後まで再生されたときの処理を追加できる
+//onMotionStartedでモーションが開始されたときの処理を追加できる
 
 //model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
-//addListnerできるイベントは"ModelHit"＝モデルタップ時発火
-//coreModelようにCubismModelのdeclare宣言必須。
 
 export class CustomModel extends EventEmitter {
-    private modelPath: string;
     //public frameContainer: PIXI.Container;
-    private container: PIXI.Container;
-    private model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null;
-    private modelHitArea: HitAreaFrames | PIXI.Graphics;
-    private modelBox: PIXI.Graphics;
-    private boxWidth: number;
-    private boxHeight: number;
-    private modelScale: number; //モデルの拡大率
+    private container: PIXI.Container; //モデルと枠を格納するコンテナ
+
+    private modelBox: PIXI.Graphics; //モデルの枠＝箱
+    private boxWidth: number; //モデルの枠の横幅
+    private boxHeight: number; ////モデルの枠の縦幅
+
+    private modelHitArea: HitAreaFrames | PIXI.Graphics; //モデルの当たり判定を表すフレーム
+
+    private audio: VOICEVOXAudio | null; //モデルの発声用のインスタンス
+
+    //モデル関係
+    private modelPath: string; //model3.jsonの位置
+    private model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
+    private modelScale: number; //モデルの表示倍率
     //modelBox中心からどれだけずれるかxyで決める
-    private modelX: number;
-    private modelY: number;
+    private modelX: number; //枠の中心からのオフセットx
+    private modelY: number; //枠の中心からのオフセットy
     private _isBoxOn: boolean; //エージェントの箱の上に乗っているか＝視線追従の基準、モデルタップの前提条件
     private _isHit: boolean; //モデルとマウスの当たり判定が生じているかどうか＝hitイベントの時の発火基準
 
-    private speaking: boolean;
-    private speakSpeed: number;
+    //発声関係
+    private speaking: boolean; //モデルが口パクしているかどうか
+    private speakSpeed: number; //モデルの口パクスピード | 2π x speakSpeed x t | で用いる
+    private voicing: boolean; //モデルが発声しているかどうか
+    private voiceVolume: number; //モデルの音量
 
-    private voicing: boolean;
-    private voiceVolume: number;
-
-    private audio: VOICEVOXVoice | null;
+    //表情関係
     private currentExpression: number | null;
     private normalExpressionIndex: number | string;
 
-    private modelFinished: boolean; //モデルが前のフレームでアップデートされていたかどうか
+    //モーション関係
+    private motionFinished: boolean; //モデルが前のフレームでアップデートされていたかどうか
+    // private reservedPriority: string;
+    // private reservedIndex: string;
 
     //モデルがマウスを追うかどうかを決める
     public mouseLooking: boolean;
@@ -95,6 +104,8 @@ export class CustomModel extends EventEmitter {
 
         this.normalExpressionIndex = normalExpressionIndex;
         this.mouseLooking = true;
+
+        this.motionFinished = true; //初回はtrueにしておく
     }
 
     /**
@@ -125,54 +136,57 @@ export class CustomModel extends EventEmitter {
         setPosition();
 
         const setListener = () => {
-            if (this.model !== null) {
-                //modelBoxにマウスが収まっていた時にonModelBox = trueとする
-                this.container.interactive = true;
-                this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
-                    // e.stopPropagation();
-                    // e.stopped = true;
-                    const localPosition = e.data.getLocalPosition(e.currentTarget);
-                    const globalPosition = e.data.global;
-                    // console.log(position);
-                    // console.log(this.boxWidth, this.boxHeight);
-                    if (this.model !== null) {
-                        if (this.overModelBox(localPosition) === true) {
-                            this._isBoxOn = true;
-                            //hitTestの帰り値は配列
-                            if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
-                                //当たったエリアの配列が帰ってくる
-                                //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
-                                this._isHit = true;
-                                this.model.buttonMode = true;
-                                //console.log("乗った");
-                            } else {
-                                this._isHit = false;
-                                this.model.buttonMode = false;
-                            }
-                        } else {
-                            this._isHit = false;
-                            this.model.buttonMode = false;
-                            //console.log("離れた");
-                            this._isBoxOn = false;
-                        }
-                    }
-                });
-                //モデルをタップした時に実行される
-                this.model.interactive = true;
-                this.model.on("hit", (hitAreaNames: Array<String>) => {
-                    if (this.model !== null && this._isHit === true) {
-                        //それぞれのエリアごとに当たり判定を見ていく
-                        Object.keys(this.model.internalModel.hitAreas).forEach((area: string) => {
-                            //console.log(area);
-                            if (hitAreaNames.includes(area) === true) {
-                                this.emit("ModelHit", area); //---------------------------------------------------
+            if (this.model === null) return console.log("モデルがない");
 
-                                // the body is hit
-                            }
-                        });
+            this.container.interactive = true;
+
+            //マウスが動いた時のリスナー登録
+            this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
+                if (this.model === null) return console.log("モデルがない");
+                //イベント伝播を止める
+                e.stopPropagation();
+                e.stopped = true;
+                //
+
+                const localPosition = e.data.getLocalPosition(e.currentTarget);
+                const globalPosition = e.data.global;
+
+                ////modelBoxにマウスが収まっていた時にonModelBox = trueとする
+                if (this.overModelBox(localPosition) === true) {
+                    this._isBoxOn = true;
+                    //hitTestの帰り値は配列
+                    if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
+                        //当たったエリアの配列が帰ってくる
+                        //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
+                        this._isHit = true;
+                        this.model.buttonMode = true;
+                        //console.log("乗った");
+                    } else {
+                        this._isHit = false;
+                        this.model.buttonMode = false;
                     }
-                });
-            }
+                } else {
+                    this._isHit = false;
+                    this.model.buttonMode = false;
+                    //console.log("離れた");
+                    this._isBoxOn = false;
+                }
+            });
+            //モデルをタップした時に実行される
+            this.model.interactive = true;
+            this.model.on("hit", (hitAreaNames: Array<String>) => {
+                if (this.model !== null && this._isHit === true) {
+                    //それぞれのエリアごとに当たり判定を見ていく
+                    Object.keys(this.model.internalModel.hitAreas).forEach((area: string) => {
+                        //console.log(area);
+                        if (hitAreaNames.includes(area) === true) {
+                            this.emit("ModelHit", area); //---------------------------------------------------
+
+                            // the body is hit
+                        }
+                    });
+                }
+            });
         };
         setListener();
 
@@ -200,18 +214,25 @@ export class CustomModel extends EventEmitter {
                     //     //console.log(motionManager.isFinished(), motionManager.playing);
                     //     console.log(motionManager.state.currentGroup, motionManager.state.currentIndex);
                     // }
+                    //モーションが終了時（中断時ではない）ときに実行
                     if (motionManager.isFinished() === true && motionManager.state.currentGroup !== void 0) {
-                        this.emit("MotionFinished", motionManager.state.currentGroup, motionManager.state.currentIndex, motionManager.state.currentPriority); //---------------------------------------------------------------------------
+                        this.emit("MotionFinished", motionManager.state.currentGroup, motionManager.state.currentIndex, motionManager.state); //---------------------------------------------------------------------------
+                        this.motionFinished = true;
+                        //console.log(motionManager.state);
                     }
                     //---------------------------------
 
                     const motionUpdated = motionManager.update(internalModel.coreModel, now);
 
                     //------------------------------
-                    // if (motionManager.isFinished() === true) {
-                    //     //console.log(motionManager.isFinished(), motionManager.playing);
-                    //     //console.log(motionManager.state.currentGroup, motionManager.state.currentIndex);
-                    // }
+                    //前回のモーションが最後まで再生され、今回のモーションが始まったら実行
+                    if (this.motionFinished === true && motionManager.playing === true) {
+                        //console.log(motionManager.isFinished(), motionManager.playing);
+                        this.motionFinished = false;
+                        this.emit("MotionStarted", motionManager.state.currentGroup, motionManager.state.currentIndex, motionManager.state);
+
+                        //console.log(motionManager.state.currentGroup, motionManager.state.currentIndex);
+                    }
                     //-----------------------------
 
                     internalModel.emit("afterMotionUpdate");
@@ -238,6 +259,7 @@ export class CustomModel extends EventEmitter {
                         internalModel.coreModel.addParameterValueById("ParamMouthOpenY", value, 0.8);
                         //console.log("口："+coreModel.getParameterValueById("ParamMouthOpenY"));
                     }
+
                     //ボリュームに基づく音声
                     if (internalModel.lipSync === true && this.voicing === true) {
                         //console.log("発話中");
@@ -417,14 +439,16 @@ export class CustomModel extends EventEmitter {
      * @param {number} index? 再生するモーションの番号 指定しない場合ランダム
      * @param {MotionPriority} priority? 再生するモーションの優先度 指定しない　場合MotionPriority.NORMAL
      */
-    setMotion = (group: string, index?: number, priority?: PIXILive2D.MotionPriority): void => {
+    forceMotion = (group: string, index?: number): void => {
         if (this.model === null) return console.log("モデルがないです");
         //--------------------------------------------
         //モデルにモーションを取らせるとき、表情が反映されないときがある
         //motion()のまえでノーマルの表情に初期化、setTImerで現在の表情をあてはめることで修正できる
         this.model.expression(this.normalExpressionIndex); //表情リセット
 
-        this.model.motion(group, index, priority); //モーション再生
+        this.model.motion(group, index, PIXILive2D.MotionPriority.FORCE); //モーション再生
+        const currentState = this.model.internalModel.motionManager.state;
+        this.emit("MotionStarted", currentState.reservedGroup, currentState.reservedIndex, currentState); //---------------------------リスナー
 
         //初期化した表情を修正
         window.setTimeout(() => {
@@ -439,7 +463,7 @@ export class CustomModel extends EventEmitter {
         this.model?.focus(x, y);
     };
 
-    setVOICEVOXvoice = (audio: VOICEVOXVoice): void => {
+    setVOICEVOXvoice = (audio: VOICEVOXAudio): void => {
         this.audio = audio;
     };
 
@@ -448,7 +472,8 @@ export class CustomModel extends EventEmitter {
      * @param {} speakSpeed 口パク速度　2π x speakSpeed
      */
     startSpeak = (speakSpeed: number): void => {
-        if (this.model === null || speakSpeed < 0) return console.log("モデルがないかsoeakSoead <0 です");
+        if (this.model === null || speakSpeed < 0) return console.log("モデルがないです");
+        if (speakSpeed < 0) return console.log("無効なspeakSpeed");
 
         //前の音をとめる
         if (this.voicing === true || this.speaking === true) {
@@ -462,7 +487,8 @@ export class CustomModel extends EventEmitter {
         this.emit("StartSpeak"); //---------------------------------------------
     };
     startVoice = async (speaker: number, text: string, volumeScale?: number) => {
-        if (this.audio === null || this.model === null) return console.log("audioがない");
+        if (this.model === null) return console.log("モデルがない");
+        if (this.audio === null) return console.log("audioがない");
         //前の音を止める
         if (this.voicing === true || this.speaking === true) {
             this.stopSpeak();
@@ -494,17 +520,17 @@ export class CustomModel extends EventEmitter {
      */
     stopSpeak = (): void => {
         if (this.model === null) return console.log("モデルがないです");
-        if (this.speaking !== false || this.voicing !== false) {
-            //前の音を止める
-            if (this.audio?.isPlaying === true) {
-                this.audio.stopVoice();
-            }
-            this.speaking = false;
-            this.voicing = false;
-            this.speakSpeed = 0;
-            this.voiceVolume = 0;
-            this.emit("StopSpeak"); //---------------------------------------------
+        if (this.speaking === false && this.voicing === false) return console.log("話していないので何もしない");
+        //
+        //前の音を止める
+        if (this.audio?.isPlaying === true) {
+            this.audio.stopVoice();
         }
+        this.speaking = false;
+        this.voicing = false;
+        this.speakSpeed = 0;
+        this.voiceVolume = 0;
+        this.emit("StopSpeak"); //---------------------------------------------
     };
 
     onModelHit = (listner: (hitArea: string) => void) => {
@@ -522,10 +548,12 @@ export class CustomModel extends EventEmitter {
     onFinishSpeak = (listner: () => void): void => {
         this.addListener("FinishSpeak", listner);
     };
-    onMotionFinished = (listner: (currentGroup: string, currentIndex: number, currentPriority: PIXILive2D.MotionPriority) => void): void => {
+    onMotionFinished = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
         this.addListener("MotionFinished", listner);
     };
-    onMotionStarted = () => {};
+    onMotionStarted = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
+        this.addListener("MotionStarted", listner);
+    };
 }
 
 // this.model.expression(1);

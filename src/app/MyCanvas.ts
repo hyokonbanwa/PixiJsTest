@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
-import { VOICEVOXVoice } from "./VOICEVOXVoice";
+import { VOICEVOXAudio } from "./VOICEVOXAudio";
 import { Client } from "voicevox-api-client";
 //import { threadId } from "worker_threads";
 // declare global {
@@ -52,7 +52,7 @@ export class MyCanvas {
         //550, 700, 0.45, 0, 500 モデル顔中心
 
         this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
-        this.hiyori.setVOICEVOXvoice(new VOICEVOXVoice(new Client("http://localhost:40080"), new AudioContext()));
+        this.hiyori.setVOICEVOXvoice(new VOICEVOXAudio(new Client("http://localhost:40080"), new AudioContext()));
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
@@ -74,7 +74,7 @@ export class MyCanvas {
             if (hitArea === "Body") {
                 //話している最中はタッチに反応しない
                 if (this.hiyori.isSpeaking === false && this.hiyori.isVoicing === false) {
-                    this.hiyori.setMotion(hitArea, undefined, PIXILive2D.MotionPriority.FORCE);
+                    this.hiyori.forceMotion(hitArea, undefined);
                     console.log("モデルヒット：" + hitArea);
                 }
             }
@@ -82,15 +82,15 @@ export class MyCanvas {
 
         //モデルが話始めたときの処理
         this.hiyori.onStartSpeak(() => {
-            this.hiyori.setMotion("StartSpeak", undefined, PIXILive2D.MotionPriority.FORCE);
+            this.hiyori.forceMotion("StartSpeak", undefined);
             this.hiyori.idleGroup = "StartSpeak";
-            console.log("話し始める。");
+            console.log("口パク、または発話始め。");
         });
 
         //モデルの口パクボイスを中断したときの処理
         this.hiyori.onStopSpeak(() => {
             this.hiyori.idleGroup = "Idle";
-            console.log("お話中断");
+            console.log("口パク、または発話中断");
         });
 
         this.hiyori.onModelUpdate(() => {
@@ -107,10 +107,13 @@ export class MyCanvas {
 
         this.hiyori.onFinishSpeak(() => {
             this.hiyori.idleGroup = "Idle";
-            console.log("話し終わった");
+            console.log("発話最後まで終了");
         });
         this.hiyori.onMotionFinished((currentGroup: string, currentIndex: number) => {
             console.log(`「${currentGroup}」グループの、「${currentIndex}」番目のモーションが終了`);
+        });
+        this.hiyori.onMotionStarted((currentGroup: string, currentIndex: number) => {
+            console.log(`「${currentGroup}」グループの、「${currentIndex}」番目のモーションが開始`);
         });
 
         this.addUpdate();
