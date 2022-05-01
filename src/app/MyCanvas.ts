@@ -64,7 +64,7 @@ export class MyCanvas {
     //ロード処理と初期配置を書く
     initialize = async () => {
         await this.hiyori.makeModel();
-        const hiyoriModel = this.hiyori.getModelBox();
+        const hiyoriModel = this.hiyori.getContainer();
         hiyoriModel.pivot.set(this.hiyori.getWidth() / 2, this.hiyori.getHeight() / 2);
         hiyoriModel.x = 500;
         hiyoriModel.y = 500;

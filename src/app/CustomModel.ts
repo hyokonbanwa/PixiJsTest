@@ -27,9 +27,9 @@ export class CustomModel extends EventEmitter {
     //モデルがマウスを追うかどうかを決める
     public mouseLooking: boolean;
 
-    // public container: PIXI.Container; //モデルと枠を格納するコンテナ
-    private boxScaleX: number;
-    private boxScaleY;
+    public container: PIXI.Container; //モデルと枠を格納するコンテナ
+    private containerScaleX: number;
+    private containerScaleY;
 
     private modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
@@ -82,7 +82,7 @@ export class CustomModel extends EventEmitter {
      */
     constructor(modelPath: string, normalExpressionIndex: number | string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         super();
-        // this.container = new PIXI.Container();
+        this.container = new PIXI.Container();
         // this.containerWidth = this.container.width;
         // this.containerHeight = this.container.height;
 
@@ -92,12 +92,12 @@ export class CustomModel extends EventEmitter {
         //Graphics.alphaとbeginFillのalphaは別物
         this.boxWidth = boxWidth;
         this.boxHeight = boxHeight;
-        this.boxScaleX = 1.0;
-        this.boxScaleY = 1.0;
+        this.containerScaleX = 1.0;
+        this.containerScaleY = 1.0;
         this.modelBox = new PIXI.Graphics();
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.alpha = 0;
-        // this.container.addChild(this.modelBox);
+        this.container.addChild(this.modelBox);
 
         console.log("大きさ");
         // console.log(this.container.width, this.container.height);
@@ -154,7 +154,7 @@ export class CustomModel extends EventEmitter {
                 console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
                 this.modelHitArea.visible = false;
                 this.model?.addChild(this.modelHitArea);
-                this.modelBox.addChild(this.model);
+                this.container.addChild(this.model);
             }
         };
         setPosition();
@@ -162,10 +162,10 @@ export class CustomModel extends EventEmitter {
         const setListener = () => {
             if (this.model === null) return console.log("モデルがない");
 
-            this.modelBox.interactive = true;
+            this.container.interactive = true;
 
             //マウスが動いた時のリスナー登録
-            this.modelBox.on("mousemove", (e: PIXI.InteractionEvent) => {
+            this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
                 if (this.model === null) return console.log("モデルがない");
                 //イベント伝播を止める
                 e.stopPropagation();
@@ -321,27 +321,34 @@ export class CustomModel extends EventEmitter {
         const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
         this.model?.update(elapsedMs);
 
-        if (this.boxScaleX !== this.modelBox.scale.x || this.boxScaleY !== this.modelBox.scale.y) {
-            const scaleX = this.modelBox.scale.x / this.boxScaleX;
-            const scaleY = this.modelBox.scale.y / this.boxScaleY;
+        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y) {
+            const scaleX = this.container.scale.x / this.containerScaleX;
+            const scaleY = this.container.scale.y / this.containerScaleY;
 
             this.boxWidth = this.boxWidth * scaleX;
             this.boxHeight = this.boxHeight * scaleY;
 
-            this.boxScaleX = this.modelBox.scale.x;
-            this.boxScaleY = this.modelBox.scale.y;
+            this.containerScaleX = this.container.scale.x;
+            this.containerScaleY = this.container.scale.y;
         }
 
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
         //見えなくなるだけで当たり判定は存在している
-        this.modelBox.filters = [new PIXI.filters.AlphaFilter(1)];
-        const containerGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
-        const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+
+        const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
+        const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
+
+        //-------------------containerで位置調整する場合
+        //const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+        //const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
         //filterAreaの位置調整
-        filterArea.x -= this.modelBox.pivot.x * this.boxScaleX;
-        filterArea.y -= this.modelBox.pivot.y * this.boxScaleY;
-        this.modelBox.filterArea = filterArea;
+        //filterArea.x -= this.container.pivot.x * this.containerScaleX;
+        //filterArea.y -= this.container.pivot.y * this.containerScaleY;
+        //---------------------------
+
+        this.container.filterArea = filterArea;
         this.filterRectagle = filterArea;
 
         //マウスを見るかの調整
@@ -366,8 +373,8 @@ export class CustomModel extends EventEmitter {
      * 移動させたいときはこのメソッドでコンテナを取得して、それを動かす
      * @returns {PIXI.Graphics} モデルの入った箱を返す。
      */
-    getModelBox = (): PIXI.Graphics => {
-        return this.modelBox;
+    getContainer = (): PIXI.Container => {
+        return this.container;
     };
     getGlobalPosition = () => {
         return this.model?.getGlobalPosition();

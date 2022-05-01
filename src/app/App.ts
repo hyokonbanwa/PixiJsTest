@@ -20,8 +20,6 @@ export class App {
         const stopButton = document.getElementById("speakStop") as HTMLElement;
         stopButton.addEventListener("click", (e: MouseEvent) => {
             this.pixiCanvas.hiyori.stopSpeak();
-            const box = this.pixiCanvas.hiyori.getModelBox();
-            box.scale.set(box.scale.x * 0.9, box.scale.y * 0.9);
         });
         const normalButton = document.getElementById("normalEx") as HTMLElement;
         normalButton.addEventListener("click", (e: MouseEvent) => {
@@ -44,8 +42,16 @@ export class App {
             this.pixiCanvas.hiyori.stopSpeak();
             // this.pixiCanvas.hiyori.container.width = 500;
             // this.pixiCanvas.hiyori.container.height = 1000;
-            const box = this.pixiCanvas.hiyori.getModelBox();
+        });
+        const expansionButton = document.getElementById("expansion") as HTMLElement;
+        expansionButton.addEventListener("click", (e: MouseEvent) => {
+            const box = this.pixiCanvas.hiyori.getContainer();
             box.scale.set(box.scale.x * 1.1, box.scale.y * 1.1);
+        });
+        const shrinkButton = document.getElementById("shrink") as HTMLElement;
+        shrinkButton.addEventListener("click", (e: MouseEvent) => {
+            const box = this.pixiCanvas.hiyori.getContainer();
+            box.scale.set(box.scale.x * 0.9, box.scale.y * 0.9);
         });
     };
 }
