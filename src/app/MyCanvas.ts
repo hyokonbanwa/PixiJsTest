@@ -2,8 +2,7 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
-import { VOICEVOXAudio } from "./VOICEVOXAudio";
-import { Client } from "voicevox-api-client";
+import { Client, Query } from "voicevox-api-client";
 //import { threadId } from "worker_threads";
 // declare global {
 //     interface Window {
@@ -33,6 +32,8 @@ type IApplicationOptions = {
 export class MyCanvas {
     private app: PIXI.Application;
     public hiyori: CustomModel;
+    private audioContext: AudioContext;
+    private voicevoxClient: Client;
     //使うものを列挙する
     constructor() {
         //window.PIXI = PIXI;
@@ -44,15 +45,20 @@ export class MyCanvas {
             height: 1000,
             view: document.getElementById("myCanvas") as HTMLCanvasElement,
             backgroundColor: 0x000099,
+            resolution: window.devicePixelRatio || 1,
+            //autoDensity: true,
             //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
+        this.audioContext = new AudioContext();
+        //http://localhost:40080
+        //http://60.130.130.16
+        this.voicevoxClient = new Client("http://192.168.3.10:40080");
 
-        //550, 900, 0.235, 0, -20 モデル全身
+        //550, 900, 0.235, 0, -20 モデル全身/
         //550, 700, 0.45, 0, 500 モデル顔中心
-
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
-        this.hiyori.setVOICEVOXvoice(new VOICEVOXAudio(new Client("http://localhost:40080"), new AudioContext()));
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 225, 350, 0.225, 0, 250);
+        this.hiyori.audioContext = this.audioContext;
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
@@ -61,6 +67,7 @@ export class MyCanvas {
         hiyoriModel.pivot.set(this.hiyori.getWidth() / 2, this.hiyori.getHeight() / 2);
         hiyoriModel.x = 500;
         hiyoriModel.y = 500;
+        //hiyoriModel.scale.set(1.25, 1.25);
         const stage = this.app.stage;
         stage.addChild(hiyoriModel);
         this.hiyori.displayBox();
@@ -154,6 +161,19 @@ export class MyCanvas {
         // ticker.add(() => model.update(ticker.elapsedMS));
     };
 
+    //VOICEVOXサーバーにリクエストしてAudioBufferをもらう関数
+    playVoice = async (speaker: number, text: string, volumeScale?: number) => {
+        const query: Query = await this.voicevoxClient.query.createQuery(speaker, text);
+        query.speedScale = 1.5;
+        //query.prePhonemeLength = 0.1;
+        query.postPhonemeLength = 0.3; //------最後に無音の時間を少し作る
+        query.volumeScale = volumeScale ?? 1;
+        const voiceArrayBuffer: ArrayBuffer = await this.voicevoxClient.voice.createVoice(speaker, query);
+        // Web Audio APIで使える形式に変換
+        const voiceAudioBufer: AudioBuffer = await this.audioContext.decodeAudioData(voiceArrayBuffer); //「ArrayBuffer」を「AudioBuffer」に変換
+        this.hiyori.startVoice(voiceAudioBufer, 15);
+    };
+
     //時間経過で必要になる処理を加えていく
     addUpdate = () => {
         this.app.ticker.add(this.hiyori.update);
@@ -168,3 +188,27 @@ export class MyCanvas {
         // }
     };
 }
+
+//         //マスクテスト
+//         const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
+//         this.container.addChild(food);
+//         const mask2 = new PIXI.Graphics();
+//         mask2.beginFill(0xffffff, 1).drawRect(0, 0, 100, 100).endFill();
+//         food.addChild(mask2); //マスクが追従する
+//         food.mask = mask2;
+//         food.y = 50;
+//         console.log(food.isMask);
+
+//         const mask = new PIXI.Graphics();
+//         mask.beginFill(0xffffff, 1).drawRect(0, 0, 1000, 1000).endFill();
+//         console.log(mask.position.x, mask.position.y);
+//         const mask3 = mask.clone();
+
+//         this.model.addChild(mask);
+//         mask.position.set(this.model.width, this.model.height);
+//         console.log(mask.position.x, mask.position.y);
+//         //this.model.mask = mask;
+//         console.log(this.model.isMask);
+//         //this.model.addChild(mask3);
+//         //mask3.position.set(this.model.width, this.model.height);
+//         console.log(mask3.position.x, mask3.position.y);

@@ -23,24 +23,28 @@ import { VOICEVOXAudio } from "./VOICEVOXAudio";
 //model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
 
 export class CustomModel extends EventEmitter {
-    //public frameContainer: PIXI.Container;
-    private container: PIXI.Container; //モデルと枠を格納するコンテナ
+    //モデルがマウスを追うかどうかを決める
+    public mouseLooking: boolean;
 
-    private modelBox: PIXI.Graphics; //モデルの枠＝箱
+    public container: PIXI.Container; //モデルと枠を格納するコンテナ
+    private containerWidth: number;
+    private containerHeight: number;
+
+    public modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
     private boxHeight: number; ////モデルの枠の縦幅
 
     private modelHitArea: HitAreaFrames | PIXI.Graphics; //モデルの当たり判定を表すフレーム
 
-    private audio: VOICEVOXAudio | null; //モデルの発声用のインスタンス
-
     //モデル関係
     private modelPath: string; //model3.jsonの位置
-    private model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
+    public model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
     private modelScale: number; //モデルの表示倍率
     //modelBox中心からどれだけずれるかxyで決める
     private modelX: number; //枠の中心からのオフセットx
     private modelY: number; //枠の中心からのオフセットy
+
+    //当たり判定関係
     private _isBoxOn: boolean; //エージェントの箱の上に乗っているか＝視線追従の基準、モデルタップの前提条件
     private _isHit: boolean; //モデルとマウスの当たり判定が生じているかどうか＝hitイベントの時の発火基準
 
@@ -59,8 +63,10 @@ export class CustomModel extends EventEmitter {
     // private reservedPriority: string;
     // private reservedIndex: string;
 
-    //モデルがマウスを追うかどうかを決める
-    public mouseLooking: boolean;
+    //音声再生関係;
+    private intervalVoiceID: number | null;
+    private _audioContext: AudioContext | null;
+    private voiceSource: AudioBufferSourceNode | null;
 
     /**
      *モデルの設定の初期化
@@ -73,39 +79,51 @@ export class CustomModel extends EventEmitter {
      */
     constructor(modelPath: string, normalExpressionIndex: number | string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         super();
-        this.modelPath = modelPath;
+        this.container = new PIXI.Container();
+        this.containerWidth = this.container.width;
+        this.containerHeight = this.container.height;
+
+        //beginFillでalpha指定するとその透明度のオブジェクトができる
+        //Graphics.alphaとbeginFillのalphaは別物
         this.boxWidth = boxWidth;
         this.boxHeight = boxHeight;
+        this.modelBox = new PIXI.Graphics();
+        this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
+        this.modelBox.alpha = 0;
+        this.container.addChild(this.modelBox);
+
+        console.log("大きさ");
+        console.log(this.container.width, this.container.height);
+        console.log(this.modelBox.width, this.modelBox.height);
+
+        this.modelHitArea = new HitAreaFrames();
+
+        this.modelPath = modelPath;
+        this.model = null;
         // let model: PIXILive2D.Live2DModel;
         // model.on = (await PIXILive2D.Live2DModel.from(this.modelPath))
         this.modelScale = modelScale ?? 1;
         this.modelX = modelX ?? 0;
         this.modelY = modelY ?? 0;
 
-        this.model = null;
-        this.modelHitArea = new HitAreaFrames();
-        this.modelBox = new PIXI.Graphics();
-        this.container = new PIXI.Container();
-        //beginFillでalpha指定するとその透明度のオブジェクトができる
-        //Graphics.alphaとbeginFillのalphaは別物
-        this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
-        this.modelBox.alpha = 0;
-        this.container.addChild(this.modelBox);
         this._isBoxOn = false;
         this._isHit = false;
 
-        this.speakSpeed = 0;
         this.speaking = false;
+        this.speakSpeed = -1;
         this.voicing = false;
-        this.voiceVolume = 0;
-        this.audio = null;
+        this.voiceVolume = -1;
 
         this.currentExpression = null;
-
         this.normalExpressionIndex = normalExpressionIndex;
-        this.mouseLooking = true;
 
         this.motionFinished = true; //初回はtrueにしておく
+
+        this.mouseLooking = true;
+
+        this._audioContext = null;
+        this.voiceSource = null;
+        this.intervalVoiceID = null;
     }
 
     /**
@@ -131,6 +149,11 @@ export class CustomModel extends EventEmitter {
                 this.modelHitArea.visible = false;
                 this.model?.addChild(this.modelHitArea);
                 this.container.addChild(this.model);
+
+                this.containerWidth = this.container.width;
+                this.containerHeight = this.container.height;
+                // this.container.width = this.modelBox.width;
+                // this.container.height = this.modelBox.height;
             }
         };
         setPosition();
@@ -263,7 +286,7 @@ export class CustomModel extends EventEmitter {
                     //ボリュームに基づく音声
                     if (internalModel.lipSync === true && this.voicing === true) {
                         //console.log("発話中");
-                        internalModel.coreModel.addParameterValueById("ParamMouthOpenY", this.voiceVolume, 0.9);
+                        internalModel.coreModel.addParameterValueById("ParamMouthOpenY", this.voiceVolume, 0.8);
                     }
                     //-----------
 
@@ -288,40 +311,70 @@ export class CustomModel extends EventEmitter {
      * @param {number} deltaFrame デルタフレーム
      */
     update = (deltaFrame: number): void => {
-        if (this.model != null) {
-            //モデルのアップデート
-            const frameRate = 60 / deltaFrame; //フレームレートを求める
-            const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
-            this.model?.update(elapsedMs);
+        if (this.model === null) return console.log("モデルがないです");
 
-            //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
-            //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
-            //見えなくなるだけで当たり判定は存在している
-            this.container.filters = [new PIXI.filters.AlphaFilter(1)];
-            const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-            const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
-            filterArea.x -= this.container.pivot.x;
-            filterArea.y -= this.container.pivot.y;
-            this.container.filterArea = filterArea;
+        //モデルのアップデート
+        const frameRate = 60 / deltaFrame; //フレームレートを求める
+        const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
+        this.model?.update(elapsedMs);
 
-            //マウスを見るかの調整
-            if (this.mouseLooking === false) {
-                const modelGlobal: PIXI.Point = this.model.getGlobalPosition() as PIXI.Point;
-                this.model.focus(modelGlobal.x, modelGlobal.y);
-            }
-            this.emit("ModelUpdate"); //----------------------------------------------------------------------------------
+        if (this.containerWidth !== this.container.width || this.containerHeight !== this.containerHeight) {
+            const scaleX = this.container.width / this.containerWidth;
+            const scaleY = this.container.height / this.containerHeight;
+            // this.modelBox.scale.set(this.modelBox.scale.x * scaleX, this.modelBox.scale.y * scaleY);
+            //this.model.scale.set(this.model.scale.x * scaleX, this.model.scale.y * scaleY);
+            // console.log(this.modelBox.scale);
+            this.boxWidth = this.boxWidth * scaleX;
+            this.boxHeight = this.modelBox.height * scaleY;
+            this.modelScale = this.modelScale * scaleX;
 
-            // const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
-            //console.log(coreModel.getParameterValueById("ParamMouthOpenY"));
+            this.modelX = this.modelX * scaleX;
+            this.modelY = this.modelY * scaleY;
+            this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
+            this.model.scale.set(this.modelScale, this.modelScale);
+            console.log(this.boxHeight, this.boxWidth);
+            console.log(scaleX, scaleY);
 
-            //現在のモーションの詳細 https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism-common/MotionManager.ts#:~:text=state%20%3D%20new%20MotionState()%3B
-            //console.log(this.model.internalModel.motionManager.state);
-
-            //現在の表情を特定する方法は不明
-            //console.log(this.model.internalModel.motionManager.expressionManager?.expressions);
-        } else {
-            console.log("nullモデルアップデート");
+            this.containerWidth = this.container.width;
+            this.containerHeight = this.container.height;
         }
+        // if(this.boxWidth )
+        // this.boxWidth = this.boxWidth * this.container.scale.x;
+        // this.boxHeight = this.boxHeight * this.container.scale.y;
+
+        // console.log("大きさ");
+        // console.log(this.container.width, this.container.height);
+        // console.log(this.modelBox.width, this.modelBox.height);
+
+        // this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
+
+        //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
+        //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
+        //見えなくなるだけで当たり判定は存在している
+        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+        const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+        const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+        //filterArea.
+        filterArea.x -= this.container.pivot.x;
+        filterArea.y -= this.container.pivot.y;
+        this.container.filterArea = filterArea;
+
+        //マウスを見るかの調整
+        if (this.mouseLooking === false) {
+            const modelGlobal: PIXI.Point = this.model.getGlobalPosition() as PIXI.Point;
+            this.model.focus(modelGlobal.x, modelGlobal.y);
+        }
+        this.emit("ModelUpdate"); //----------------------------------------------------------------------------------
+
+        // const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
+        //console.log(coreModel.getParameterValueById("ParamMouthOpenY"));
+
+        //現在のモーションの詳細 https://github.com/guansss/pixi-live2d-display/blob/b51b9cb/src/cubism-common/MotionManager.ts#:~:text=state%20%3D%20new%20MotionState()%3B
+        //console.log(this.model.internalModel.motionManager.state);
+
+        //現在の表情を特定する方法は不明
+        //console.log(this.model.internalModel.motionManager.expressionManager?.expressions);
+        //console.log(this.intervalVoiceID)
     };
 
     //モデルを格納しているcontainerの左上頂点を基準点として描画したいエリアのx,y,width,heightを指定する
@@ -422,6 +475,10 @@ export class CustomModel extends EventEmitter {
         return this.model?.internalModel.motionManager.state;
     }
 
+    set audioContext(audioContext: AudioContext) {
+        this._audioContext = audioContext;
+    }
+
     /**
      * 表情再生
      * @param {number | string } id? 表情の番号または名前、指定しない場合ランダム
@@ -463,10 +520,6 @@ export class CustomModel extends EventEmitter {
         this.model?.focus(x, y);
     };
 
-    setVOICEVOXvoice = (audio: VOICEVOXAudio): void => {
-        this.audio = audio;
-    };
-
     /**
      * 口パク開始
      * @param {} speakSpeed 口パク速度　2π x speakSpeed
@@ -486,33 +539,75 @@ export class CustomModel extends EventEmitter {
 
         this.emit("StartSpeak"); //---------------------------------------------
     };
-    startVoice = async (speaker: number, text: string, volumeScale?: number) => {
+
+    //audioBufferを受け取って音声を再生し、リアルタイムに「audioBuffer」の音量に応じて口パクする
+    startVoice = (audioBuffer: AudioBuffer, frequency?: number) => {
         if (this.model === null) return console.log("モデルがない");
-        if (this.audio === null) return console.log("audioがない");
+        if (this._audioContext === null) return console.log("AudioContextがない");
         //前の音を止める
         if (this.voicing === true || this.speaking === true) {
             this.stopSpeak();
         }
         this.voicing = true;
-
-        const audioBuffer: AudioBuffer = await this.audio.createVoice(speaker, text, volumeScale);
-        const setVoiceVolume = (volume: number): void => {
-            this.voiceVolume = volume;
-        };
-        const onVoiceStop = (): void => {
-            this.emit("FinishSpeak"); //-------------------------------
-            this.voicing = false;
-        };
-        this.audio.playVoice(audioBuffer, true, setVoiceVolume, 15, onVoiceStop); //this.stopSpeakを登録しない、endedでspeaking,voicing両方falseになるため
         this.emit("StartSpeak"); //----------------------------------------
 
-        //startVoiceを再生中にstartVoiceすると 次のstartVoiceのvoicing = true の後
-        //前のstartVoiceのonVoiceStopが実行されて、voicing = falseになってしまう
-        //よって数十ms後にvoicingをtrueにする。
-        window.setTimeout(() => {
-            if (this.voicing === true) return;
-            this.voicing = true;
-        }, 10);
+        const startVoiceTime = this._audioContext.currentTime;
+        frequency = frequency ?? 15;
+        //AudioCOntextで扱うプレイヤー作成
+        this.voiceSource = this._audioContext.createBufferSource();
+        // 変換されたバッファーを音源として設定
+        this.voiceSource.buffer = audioBuffer; //音源をプレイヤーに設定
+        //アナライザー作成
+        const analyser: AnalyserNode = this._audioContext.createAnalyser();
+        analyser.fftSize = 512; //サンプリングレート
+
+        //プレイヤー→アナライザー→出力
+        //プレイヤーをアナライザーにつなげる。
+        this.voiceSource.connect(analyser);
+        //アナライザーを出力につなげる。
+        analyser.connect(this._audioContext.destination);
+
+        //再生終了時にstop()するリスナー登録
+        //-------------------------------------------------------ここで登録されたリスナーはAudioSourceNode.stop()時にじっこうさせるので注意
+        this.voiceSource.addEventListener("ended", (e: Event) => {
+            if (this._audioContext === null || this.voiceSource === null) return console.log("無効なended");
+            if (this.voiceSource.buffer === null) return console.log("モデルにAudioBufferがセットされていない");
+
+            //console.log("AudioNodeストップ");
+            if (this.voiceSource.buffer?.duration <= this._audioContext.currentTime - startVoiceTime && this.intervalVoiceID !== null) {
+                this.emit("FinishSpeak"); //-------------------------------
+                this.voicing = false;
+                window.clearInterval(this.intervalVoiceID);
+            }
+        });
+        //再生開始
+        this.voiceSource.start();
+
+        //解析する
+        //ループするリスナー登録
+        this.intervalVoiceID = window.setInterval(() => {
+            // 一秒あたりfftSize個に分割した音量を取得する
+            const timeVolumes = new Uint8Array(analyser.fftSize);
+            analyser.getByteTimeDomainData(timeVolumes);
+            const currentVolume = normalizeLastVolume(timeVolumes); //音量を0～1に正規化
+            this.voiceVolume = currentVolume;
+
+            function normalizeLastVolume(volumes: Uint8Array) {
+                // console.log((times[times.length - 1] - ave) / he);
+                //値を正規化
+                const tmp = (volumes[volumes.length - 1] - Math.min(...volumes)) / (Math.max(...volumes) - Math.min(...volumes));
+                //127,128が多ければ無音と考える削除する
+                let cnt = 0;
+                volumes.forEach((currentValue: number) => {
+                    if (currentValue === 127 || currentValue === 128) {
+                        cnt += 1;
+                    }
+                });
+                //条件は127,128のかずが半分以下、Nanじゃない、1と0じゃない
+                const volume = cnt < (volumes.length - 1) / 2 && isNaN(tmp) !== true && 0 < tmp && tmp < 1 ? tmp : 0;
+                return volume;
+            }
+        }, 1000 / frequency);
     };
 
     /**
@@ -523,8 +618,10 @@ export class CustomModel extends EventEmitter {
         if (this.speaking === false && this.voicing === false) return console.log("話していないので何もしない");
         //
         //前の音を止める
-        if (this.audio?.isPlaying === true) {
-            this.audio.stopVoice();
+        if (this.voicing === true && this.intervalVoiceID !== null) {
+            this.voiceSource?.stop();
+            window.clearInterval(this.intervalVoiceID);
+            this.intervalVoiceID = null;
         }
         this.speaking = false;
         this.voicing = false;
