@@ -43,7 +43,7 @@
 					"FadeOutTime": 0.5
 				}
 			],
-			"Body": [
+			"TapBody": [
 				{
 					"File": "motions/Hiyori_m02.motion3.json",
 					"FadeInTime": 0.5,

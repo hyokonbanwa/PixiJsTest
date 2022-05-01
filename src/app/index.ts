@@ -27,9 +27,10 @@ import { Live2DModel, Live2DFactoryOptions } from "pixi-live2d-display";
     // }
     // init();
     //-- App初期化
-
     const app: App = new App();
-    app.mount();
+    window.addEventListener("load", () => {
+        app.mount();
+    });
     //let app: App | null = null;
     // DOMContentLoadedだと発火されないときがある;
     // document.addEventListener("DOMContentLoaded", () => {

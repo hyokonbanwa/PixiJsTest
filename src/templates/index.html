@@ -17,22 +17,30 @@
             <div class="row m-2">
                 <canvas id="myCanvas" class="border border-5 rounded-3 border-info"></canvas>
             </div>
+
             <div class="row m-2">
-                <button type="button" id="speakStart" class="col">口パク</button>
-                <button type="button" id="speakStop" class="col">やめる</button>
+                <button type="button" id="expansion" class="col">拡大</button>
+                <button type="button" id="shrink" class="col">縮小</button>
             </div>
             <div class="row m-2">
                 <button type="button" id="normalEx" class="col">ノーマル</button>
                 <button type="button" id="negativeEx" class="col">マイナス</button>
             </div>
             <div class="row m-2">
-                <button type="button" id="voiceStart" class="col">発話</button>
-                <button type="button" id="voiceStop" class="col">やめる</button>
+                <button type="button" id="speakStart" class="col">口パク</button>
+                <button type="button" id="speakStop" class="col">やめる</button>
             </div>
             <div class="row m-2">
-                <button type="button" id="expansion" class="col">拡大</button>
-                <button type="button" id="shrink" class="col">縮小</button>
+                <select class ="col-1" id="select">
+                    <!-- <option value="サンプル1">1</option>
+                    <option value="サンプル2">2</option>
+                    <option value="サンプル3">3</option>
+                    <option value="サンプル3" selected>4</option> -->
+                </select>
+                <input type ="text" id = "textBox" class ="col-8" placeholder = "AIにしゃべらせたい文字列"></input>
+                <button type="button" id="voiceStart" class="col-3">発話</button>
             </div>
+
         </div>
         <!-- <canvas id="canvas"></canvas> -->
         <!-- <script>

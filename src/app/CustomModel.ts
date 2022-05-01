@@ -3,7 +3,20 @@ import * as PIXILive2D from "pixi-live2d-display";
 import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
 import { VOICEVOXAudio } from "./VOICEVOXAudio";
+import { trace } from "console";
 
+interface DragObject extends PIXI.DisplayObject {
+    dragging: boolean;
+    data: PIXI.InteractionData | null;
+}
+
+interface CustomModelSettings extends PIXILive2D.ModelSettings {
+    expressions?: Object[];
+    groups?: Object[];
+    hitAreas?: Object[];
+    layout?: any;
+    motions?: Object[];
+}
 /**
  * ToDo
  * 回転に対応
@@ -63,6 +76,8 @@ export class CustomModel extends EventEmitter {
 
     //モーション関係
     private motionFinished: boolean; //モデルが前のフレームでアップデートされていたかどうか
+    private _dragging: boolean; //drag中であるかを表す
+    private _draggable: boolean;
     // private reservedPriority: string;
     // private reservedIndex: string;
 
@@ -87,6 +102,7 @@ export class CustomModel extends EventEmitter {
         // this.containerHeight = this.container.height;
 
         this.filterRectagle = new PIXI.Rectangle();
+        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
 
         //beginFillでalpha指定するとその透明度のオブジェクトができる
         //Graphics.alphaとbeginFillのalphaは別物
@@ -98,10 +114,6 @@ export class CustomModel extends EventEmitter {
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.alpha = 0;
         this.container.addChild(this.modelBox);
-
-        console.log("大きさ");
-        // console.log(this.container.width, this.container.height);
-        //console.log(this.modelBox.width, this.modelBox.height);
 
         this.modelHitArea = new HitAreaFrames();
 
@@ -125,6 +137,8 @@ export class CustomModel extends EventEmitter {
         this.normalExpressionIndex = normalExpressionIndex;
 
         this.motionFinished = true; //初回はtrueにしておく
+        this._dragging = false;
+        this._draggable = false;
 
         this.mouseLooking = true;
 
@@ -151,7 +165,7 @@ export class CustomModel extends EventEmitter {
                 this.model.scale.set(this.modelScale, this.modelScale);
 
                 this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
-                console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
+                //console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
                 this.modelHitArea.visible = false;
                 this.model?.addChild(this.modelHitArea);
                 this.container.addChild(this.model);
@@ -179,9 +193,10 @@ export class CustomModel extends EventEmitter {
                 ////modelBoxにマウスが収まっていた時にonModelBox = trueとする
                 if (this.filterRectagle.contains(globalPosition.x, globalPosition.y) === true) {
                     this._isBoxOn = true;
+
                     //hitTestの帰り値は配列
                     const hitAreas: string[] = this.model.hitTest(globalPosition.x, globalPosition.y);
-                    if (hitAreas.length !== 0) {
+                    if (hitAreas.length !== 0 && this._dragging === false) {
                         //当たったエリアの配列が帰ってくる
                         //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
                         this._isHit = true;
@@ -194,7 +209,7 @@ export class CustomModel extends EventEmitter {
                     }
                 } else {
                     this._isHit = false;
-                    this.model.buttonMode = false;
+                    //this.model.buttonMode = false;
                     //console.log("離れた");
                     this._isBoxOn = false;
                 }
@@ -214,6 +229,107 @@ export class CustomModel extends EventEmitter {
                     });
                 }
             });
+
+            let offsetX: number | null;
+            let offsetY: number | null;
+            const onDragStart = (event: PIXI.InteractionEvent): void => {
+                // store a reference to the data
+                // the reason for this is because of multitouch
+                // we want to track the movement of this particular touch
+
+                //this._draggable = false　なら実行しない
+                if (this._isBoxOn === false || this._draggable === false) return;
+                const target: DragObject = event.currentTarget as DragObject;
+                target.data = event.data;
+
+                target.dragging = true;
+
+                //親要素基準のマウスのローカルポジション
+                const localPosition = event.data.getLocalPosition(target.parent);
+                //console.log(localPosition);
+                offsetX = localPosition.x - target.x;
+                offsetY = localPosition.y - target.y;
+                //console.log(offsetX, offsetY);
+                // const globalPosition = event.data.global;
+                // console.log(globalPosition);
+                //offsetX = globalPosition.x -
+            };
+
+            const onDragEnd = (event: PIXI.InteractionEvent): void => {
+                const target: DragObject = event.currentTarget as DragObject;
+                if (target.dragging === true) {
+                    this._dragging = false;
+
+                    target.alpha = 1;
+                    this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+                    target.dragging = false;
+                    // set the interaction data to null
+                    target.data = null;
+
+                    offsetX = null;
+                    offsetY = null;
+                }
+            };
+
+            const onDragMove = (event: PIXI.InteractionEvent): void => {
+                const target: DragObject = event.currentTarget as DragObject;
+                if (target.dragging === true && target.data !== null && offsetX !== null && offsetY !== null) {
+                    this._dragging = true;
+                    target.alpha = 0.5;
+                    this.container.filters = [new PIXI.filters.AlphaFilter(0.5)];
+                    const newPosition = target.data.getLocalPosition(target.parent);
+                    target.x = newPosition.x - offsetX;
+                    target.y = newPosition.y - offsetY;
+                }
+            };
+            this.container.on("pointerdown", onDragStart).on("pointerup", onDragEnd).on("pointerupoutside", onDragEnd).on("pointermove", onDragMove);
+
+            // function onDragStart(event: PIXI.InteractionEvent) {
+            //     const obj = event.currentTarget as DragObject;
+            //     obj.dragData = event.data;
+            //     obj.dragging = 1;
+            //     obj.dragPointerStart = event.data.getLocalPosition(obj.parent);
+            //     obj.dragObjStart = new PIXI.Point();
+            //     obj.dragObjStart.copyFrom(obj.position);
+            //     obj.dragGlobalStart = new PIXI.Point();
+            //     obj.dragGlobalStart.copyFrom(event.data.global);
+            // }
+
+            // function onDragEnd(event: PIXI.InteractionEvent) {
+            //     const obj = event.currentTarget as DragObject;
+            //     if (!obj.dragging) return;
+
+            //     snap(obj);
+
+            //     obj.dragging = 0;
+            //     // set the interaction data to null
+            //     // obj.dragData = null
+            // }
+
+            // function onDragMove(event: PIXI.InteractionEvent) {
+            //     const obj = event.currentTarget as DragObject;
+            //     if (!obj.dragging) return;
+            //     const data = obj.dragData; // it can be different pointer!
+            //     if (obj.dragging === 1) {
+            //         // click or drag?
+            //         if (Math.abs(data.global.x - obj.dragGlobalStart.x) + Math.abs(data.global.y - obj.dragGlobalStart.y) >= 3) {
+            //             // DRAG
+            //             obj.dragging = 2;
+            //         }
+            //     }
+            //     if (obj.dragging === 2) {
+            //         const dragPointerEnd = data.getLocalPosition(obj.parent);
+            //         // DRAG
+            //         obj.position.set(obj.dragObjStart.x + (dragPointerEnd.x - obj.dragPointerStart.x), obj.dragObjStart.y + (dragPointerEnd.y - obj.dragPointerStart.y));
+            //     }
+            // }
+
+            // // === CLICKS AND SNAP ===
+
+            // function snap(obj: DragObject) {
+            //     obj.position.x = Math.min(Math.max(obj.position.x, 0), app.screen.width);
+            //     obj.position.y = Math.min(Math.max(obj.position.y, 0), app.screen.height);
+            // }
         };
         setListener();
 
@@ -335,17 +451,16 @@ export class CustomModel extends EventEmitter {
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
         //見えなくなるだけで当たり判定は存在している
-        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
 
-        const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
-        const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
+        // const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
+        // const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
 
         //-------------------containerで位置調整する場合
-        //const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-        //const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+        const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+        const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
         //filterAreaの位置調整
-        //filterArea.x -= this.container.pivot.x * this.containerScaleX;
-        //filterArea.y -= this.container.pivot.y * this.containerScaleY;
+        filterArea.x -= this.container.pivot.x * this.containerScaleX;
+        filterArea.y -= this.container.pivot.y * this.containerScaleY;
         //---------------------------
 
         this.container.filterArea = filterArea;
@@ -356,6 +471,7 @@ export class CustomModel extends EventEmitter {
             const modelGlobal: PIXI.Point = this.model.getGlobalPosition() as PIXI.Point;
             this.model.focus(modelGlobal.x, modelGlobal.y);
         }
+
         this.emit("ModelUpdate"); //----------------------------------------------------------------------------------
 
         // const coreModel: MyCubismModel = this.model.internalModel.coreModel as MyCubismModel;
@@ -415,6 +531,23 @@ export class CustomModel extends EventEmitter {
         this.modelHitArea.visible = false;
     };
 
+    // draggable = (model):void => {
+    //     model.buttonMode = true;
+    //     model.on("pointerdown", (e) => {
+    //       model.dragging = true;
+    //       model._pointerX = e.data.global.x - model.x;
+    //       model._pointerY = e.data.global.y - model.y;
+    //     });
+    //     model.on("pointermove", (e) => {
+    //       if (model.dragging) {
+    //         model.position.x = e.data.global.x - model._pointerX;
+    //         model.position.y = e.data.global.y - model._pointerY;
+    //       }
+    //     });
+    //     model.on("pointerupoutside", () => (model.dragging = false));
+    //     model.on("pointerup", () => (model.dragging = false));
+    //   }
+
     /**
      * タップに反応するかどうかを決めるセッター
      * {CubismModel}.interactive = true;
@@ -428,6 +561,27 @@ export class CustomModel extends EventEmitter {
     set idleGroup(groupName: string) {
         if (this.model === null) return;
         this.model.internalModel.motionManager.groups.idle = groupName;
+    }
+
+    set audioContext(audioContext: AudioContext) {
+        this._audioContext = audioContext;
+    }
+
+    set buttonMode(bool: boolean) {
+        if (this.model === null) return;
+        this.model.buttonMode = bool;
+    }
+
+    set draggable(bool: boolean) {
+        this._draggable = bool;
+    }
+
+    get draggable(): boolean {
+        return this._draggable;
+    }
+
+    get dragging(): boolean {
+        return this._dragging;
     }
     get isSpeaking(): boolean {
         return this.speaking;
@@ -444,15 +598,6 @@ export class CustomModel extends EventEmitter {
     get motionState(): PIXILive2D.MotionState | void {
         if (this.model === null) return console.log("モデルがないです");
         return this.model?.internalModel.motionManager.state;
-    }
-
-    set audioContext(audioContext: AudioContext) {
-        this._audioContext = audioContext;
-    }
-
-    set buttonMode(bool: boolean) {
-        if (this.model === null) return;
-        this.model.buttonMode = bool;
     }
 
     onHitAreaOver = (listner: (hitAreas: string[]) => void) => {
@@ -499,6 +644,13 @@ export class CustomModel extends EventEmitter {
      */
     forceMotion = (group: string, index?: number): void => {
         if (this.model === null) return console.log("モデルがないです");
+
+        //モーショングループ名がsettingsにあるか確認
+        const settings: CustomModelSettings = this.model.internalModel.settings;
+        const motionGroups: string[] = Object.keys(settings.motions as {}[]);
+        //console.log(motionGroups.includes(group));
+        if (motionGroups.includes(group) === false) return console.log(`${group}というMorionGroupは存在しない`);
+
         //--------------------------------------------
         //モデルにモーションを取らせるとき、表情が反映されないときがある
         //motion()のまえでノーマルの表情に初期化、setTImerで現在の表情をあてはめることで修正できる

@@ -70,19 +70,25 @@ export class MyCanvas {
         hiyoriModel.y = 500;
         //hiyoriModel.scale.set(1.25, 1.25);
         const stage = this.app.stage;
-        stage.addChild(hiyoriModel);
+        const dai = new PIXI.Graphics();
+        dai.beginFill(0xcc0000).drawRect(0, 0, 500, 500).endFill();
+        dai.x = 100;
+        dai.y = 100;
+        dai.addChild(hiyoriModel);
+        stage.addChild(dai);
         this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
         //this.hiyori.hitAreaOff();
 
         this.hiyori.idleGroup = "Idle"; //ひよりの通常時のモーショングループ
+        this.hiyori.draggable = true;
         //モデルをタップした時の動作を追加
         this.hiyori.onModelHit((hitArea: string) => {
             //体に当たったときのみ反応
             if (hitArea === "Body") {
                 //話している最中はタッチに反応しない
                 if (this.hiyori.isSpeaking === false && this.hiyori.isVoicing === false) {
-                    this.hiyori.forceMotion(hitArea, undefined);
+                    this.hiyori.forceMotion("TapBody", undefined);
                     console.log("モデルヒット：" + hitArea);
                 }
             }
@@ -114,11 +120,19 @@ export class MyCanvas {
                 this.hiyori.mouseLooking = true;
             }
 
+            //モデルの当たり判定が発生しているとき　buttonmode = true
             if (this.hiyori.isHit === true) {
                 this.hiyori.buttonMode = true;
             } else {
                 this.hiyori.buttonMode = false;
             }
+
+            //ドラッグしているとき
+            // if (this.hiyori.draggable === true && this.hiyori.isBoxOn === true) {
+            //     //console.log(this.hiyori.buttonMode);
+            //     this.hiyori.buttonMode = true;
+            // }
+
             //console.log(this.hiyori.isSpeaking, this.hiyori.isVoicing);
             //console.log(this.hiyori.motionState);
         });
@@ -175,7 +189,7 @@ export class MyCanvas {
     //VOICEVOXサーバーにリクエストしてAudioBufferをもらう関数
     playVoice = async (speaker: number, text: string, volumeScale?: number) => {
         const query: Query = await this.voicevoxClient.query.createQuery(speaker, text);
-        query.speedScale = 1.5;
+        query.speedScale = 1.1;
         //query.prePhonemeLength = 0.1;
         query.postPhonemeLength = 0.3; //------最後に無音の時間を少し作る
         query.volumeScale = volumeScale ?? 1;
