@@ -57,13 +57,14 @@ export class MyCanvas {
 
         //550, 900, 0.235, 0, -20 モデル全身/
         //550, 700, 0.45, 0, 500 モデル顔中心
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 225, 350, 0.225, 0, 250);
+        //225, 350, 0.25, 0, 250
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
         this.hiyori.audioContext = this.audioContext;
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
         await this.hiyori.makeModel();
-        const hiyoriModel = this.hiyori.getContainer();
+        const hiyoriModel = this.hiyori.getModelBox();
         hiyoriModel.pivot.set(this.hiyori.getWidth() / 2, this.hiyori.getHeight() / 2);
         hiyoriModel.x = 500;
         hiyoriModel.y = 500;
@@ -87,6 +88,10 @@ export class MyCanvas {
             }
         });
 
+        this.hiyori.onHitAreaOver((hitAreas: string[]) => {
+            //console.log(hitAreas);
+        });
+
         //モデルが話始めたときの処理
         this.hiyori.onStartSpeak(() => {
             this.hiyori.forceMotion("StartSpeak", undefined);
@@ -107,6 +112,12 @@ export class MyCanvas {
                 this.hiyori.mouseLooking = false;
             } else {
                 this.hiyori.mouseLooking = true;
+            }
+
+            if (this.hiyori.isHit === true) {
+                this.hiyori.buttonMode = true;
+            } else {
+                this.hiyori.buttonMode = false;
             }
             //console.log(this.hiyori.isSpeaking, this.hiyori.isVoicing);
             //console.log(this.hiyori.motionState);

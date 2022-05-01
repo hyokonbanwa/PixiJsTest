@@ -12,6 +12,7 @@ import { VOICEVOXAudio } from "./VOICEVOXAudio";
 //欠陥：モーションに一意の番号が無いので、予約再生時にモーションを区別できない よってgithubからソースを持ってきてMotionStateが一意のキーを持てるようにする必要がある
 
 //イベント一覧
+//onHitAreaOverでモデルの当たり判定エリアにマウスが乗ったときの動作を追加できる
 //onModelHitでモデルをクリックしたときの動作を追加できる。
 //onStartSpeakでモデルが話し始めたときの処理を追加できる。
 //onStopSpeakでモデルが話し終わる（中断させる）ときの処理を追加できる。
@@ -26,19 +27,21 @@ export class CustomModel extends EventEmitter {
     //モデルがマウスを追うかどうかを決める
     public mouseLooking: boolean;
 
-    public container: PIXI.Container; //モデルと枠を格納するコンテナ
-    private containerWidth: number;
-    private containerHeight: number;
+    // public container: PIXI.Container; //モデルと枠を格納するコンテナ
+    private boxScaleX: number;
+    private boxScaleY;
 
-    public modelBox: PIXI.Graphics; //モデルの枠＝箱
+    private modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
     private boxHeight: number; ////モデルの枠の縦幅
+
+    private filterRectagle: PIXI.Rectangle;
 
     private modelHitArea: HitAreaFrames | PIXI.Graphics; //モデルの当たり判定を表すフレーム
 
     //モデル関係
     private modelPath: string; //model3.jsonの位置
-    public model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
+    private model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
     private modelScale: number; //モデルの表示倍率
     //modelBox中心からどれだけずれるかxyで決める
     private modelX: number; //枠の中心からのオフセットx
@@ -79,22 +82,26 @@ export class CustomModel extends EventEmitter {
      */
     constructor(modelPath: string, normalExpressionIndex: number | string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         super();
-        this.container = new PIXI.Container();
-        this.containerWidth = this.container.width;
-        this.containerHeight = this.container.height;
+        // this.container = new PIXI.Container();
+        // this.containerWidth = this.container.width;
+        // this.containerHeight = this.container.height;
+
+        this.filterRectagle = new PIXI.Rectangle();
 
         //beginFillでalpha指定するとその透明度のオブジェクトができる
         //Graphics.alphaとbeginFillのalphaは別物
         this.boxWidth = boxWidth;
         this.boxHeight = boxHeight;
+        this.boxScaleX = 1.0;
+        this.boxScaleY = 1.0;
         this.modelBox = new PIXI.Graphics();
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.alpha = 0;
-        this.container.addChild(this.modelBox);
+        // this.container.addChild(this.modelBox);
 
         console.log("大きさ");
-        console.log(this.container.width, this.container.height);
-        console.log(this.modelBox.width, this.modelBox.height);
+        // console.log(this.container.width, this.container.height);
+        //console.log(this.modelBox.width, this.modelBox.height);
 
         this.modelHitArea = new HitAreaFrames();
 
@@ -142,18 +149,12 @@ export class CustomModel extends EventEmitter {
             if (this.model !== null) {
                 this.model.anchor.set(0.5, 0.5);
                 this.model.scale.set(this.modelScale, this.modelScale);
-                //console.log(this.modelX, this.modelY);
-                //this.model.position.set(this.modelX, this.modelY);
+
                 this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
                 console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
                 this.modelHitArea.visible = false;
                 this.model?.addChild(this.modelHitArea);
-                this.container.addChild(this.model);
-
-                this.containerWidth = this.container.width;
-                this.containerHeight = this.container.height;
-                // this.container.width = this.modelBox.width;
-                // this.container.height = this.modelBox.height;
+                this.modelBox.addChild(this.model);
             }
         };
         setPosition();
@@ -161,32 +162,35 @@ export class CustomModel extends EventEmitter {
         const setListener = () => {
             if (this.model === null) return console.log("モデルがない");
 
-            this.container.interactive = true;
+            this.modelBox.interactive = true;
 
             //マウスが動いた時のリスナー登録
-            this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
+            this.modelBox.on("mousemove", (e: PIXI.InteractionEvent) => {
                 if (this.model === null) return console.log("モデルがない");
                 //イベント伝播を止める
                 e.stopPropagation();
                 e.stopped = true;
                 //
+                //console.log("イベント");
 
-                const localPosition = e.data.getLocalPosition(e.currentTarget);
-                const globalPosition = e.data.global;
+                // const localPosition = e.data.getLocalPosition(e.currentTarget);//マウスのローカル座標
+                const globalPosition = e.data.global; //マウスのグローバル座標
 
                 ////modelBoxにマウスが収まっていた時にonModelBox = trueとする
-                if (this.overModelBox(localPosition) === true) {
+                if (this.filterRectagle.contains(globalPosition.x, globalPosition.y) === true) {
                     this._isBoxOn = true;
                     //hitTestの帰り値は配列
-                    if (this.model.hitTest(globalPosition.x, globalPosition.y).length !== 0) {
+                    const hitAreas: string[] = this.model.hitTest(globalPosition.x, globalPosition.y);
+                    if (hitAreas.length !== 0) {
                         //当たったエリアの配列が帰ってくる
                         //console.log(this.model.hitTest(globalPosition.x, globalPosition.y));
                         this._isHit = true;
-                        this.model.buttonMode = true;
+                        this.emit("HitAreaOver", hitAreas);
+                        //this.model.buttonMode = true;
                         //console.log("乗った");
                     } else {
                         this._isHit = false;
-                        this.model.buttonMode = false;
+                        //this.model.buttonMode = false;
                     }
                 } else {
                     this._isHit = false;
@@ -297,7 +301,6 @@ export class CustomModel extends EventEmitter {
 
                     internalModel.coreModel.update();
                     internalModel.coreModel.loadParameters();
-                    //console.log("updateしてる");
                 };
             }
         };
@@ -318,46 +321,28 @@ export class CustomModel extends EventEmitter {
         const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
         this.model?.update(elapsedMs);
 
-        if (this.containerWidth !== this.container.width || this.containerHeight !== this.containerHeight) {
-            const scaleX = this.container.width / this.containerWidth;
-            const scaleY = this.container.height / this.containerHeight;
-            // this.modelBox.scale.set(this.modelBox.scale.x * scaleX, this.modelBox.scale.y * scaleY);
-            //this.model.scale.set(this.model.scale.x * scaleX, this.model.scale.y * scaleY);
-            // console.log(this.modelBox.scale);
+        if (this.boxScaleX !== this.modelBox.scale.x || this.boxScaleY !== this.modelBox.scale.y) {
+            const scaleX = this.modelBox.scale.x / this.boxScaleX;
+            const scaleY = this.modelBox.scale.y / this.boxScaleY;
+
             this.boxWidth = this.boxWidth * scaleX;
-            this.boxHeight = this.modelBox.height * scaleY;
-            this.modelScale = this.modelScale * scaleX;
+            this.boxHeight = this.boxHeight * scaleY;
 
-            this.modelX = this.modelX * scaleX;
-            this.modelY = this.modelY * scaleY;
-            this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
-            this.model.scale.set(this.modelScale, this.modelScale);
-            console.log(this.boxHeight, this.boxWidth);
-            console.log(scaleX, scaleY);
-
-            this.containerWidth = this.container.width;
-            this.containerHeight = this.container.height;
+            this.boxScaleX = this.modelBox.scale.x;
+            this.boxScaleY = this.modelBox.scale.y;
         }
-        // if(this.boxWidth )
-        // this.boxWidth = this.boxWidth * this.container.scale.x;
-        // this.boxHeight = this.boxHeight * this.container.scale.y;
-
-        // console.log("大きさ");
-        // console.log(this.container.width, this.container.height);
-        // console.log(this.modelBox.width, this.modelBox.height);
-
-        // this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
 
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
         //見えなくなるだけで当たり判定は存在している
-        this.container.filters = [new PIXI.filters.AlphaFilter(1)];
-        const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+        this.modelBox.filters = [new PIXI.filters.AlphaFilter(1)];
+        const containerGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
         const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
-        //filterArea.
-        filterArea.x -= this.container.pivot.x;
-        filterArea.y -= this.container.pivot.y;
-        this.container.filterArea = filterArea;
+        //filterAreaの位置調整
+        filterArea.x -= this.modelBox.pivot.x * this.boxScaleX;
+        filterArea.y -= this.modelBox.pivot.y * this.boxScaleY;
+        this.modelBox.filterArea = filterArea;
+        this.filterRectagle = filterArea;
 
         //マウスを見るかの調整
         if (this.mouseLooking === false) {
@@ -377,33 +362,12 @@ export class CustomModel extends EventEmitter {
         //console.log(this.intervalVoiceID)
     };
 
-    //モデルを格納しているcontainerの左上頂点を基準点として描画したいエリアのx,y,width,heightを指定する
-    // maskRentagle = () => {
-    //     this.container.filters = [new PIXI.filters.AlphaFilter(1)];
-    //     const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-    //     this.container.filterArea = new PIXI.Rectangle(containerGlobal.x + x, containerGlobal.y + y, width, height);
-    //     this.filterX = this.container.x;
-    //     this.filterY = this.container.y;
-    //     this.filterWidth = width;
-    //     this.filterHeight = height;
-    //     this.isFilter = true;
-    // };
-
-    //座標が四角の範囲内にあるかどうかを計算する
-    overModelBox = (point: PIXI.Point): boolean => {
-        if (point.x >= 0 && point.y >= 0 && point.x <= this.boxWidth && point.y <= this.boxHeight) {
-            return true;
-        } else {
-            return false;
-        }
-    };
-
     /**
      * 移動させたいときはこのメソッドでコンテナを取得して、それを動かす
-     * @returns {PIXI.Container} モデルの入った箱を返す。
+     * @returns {PIXI.Graphics} モデルの入った箱を返す。
      */
-    getContainer = (): PIXI.Container => {
-        return this.container;
+    getModelBox = (): PIXI.Graphics => {
+        return this.modelBox;
     };
     getGlobalPosition = () => {
         return this.model?.getGlobalPosition();
@@ -478,6 +442,36 @@ export class CustomModel extends EventEmitter {
     set audioContext(audioContext: AudioContext) {
         this._audioContext = audioContext;
     }
+
+    set buttonMode(bool: boolean) {
+        if (this.model === null) return;
+        this.model.buttonMode = bool;
+    }
+
+    onHitAreaOver = (listner: (hitAreas: string[]) => void) => {
+        this.addListener("HitAreaOver", listner);
+    };
+    onModelHit = (listner: (hitArea: string) => void) => {
+        this.addListener("ModelHit", listner);
+    };
+    onStartSpeak = (listner: () => void): void => {
+        this.addListener("StartSpeak", listner);
+    };
+    onStopSpeak = (listner: () => void): void => {
+        this.addListener("StopSpeak", listner);
+    };
+    onModelUpdate = (listner: (deltaTime: number) => void) => {
+        this.addListener("ModelUpdate", listner);
+    };
+    onFinishSpeak = (listner: () => void): void => {
+        this.addListener("FinishSpeak", listner);
+    };
+    onMotionFinished = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
+        this.addListener("MotionFinished", listner);
+    };
+    onMotionStarted = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
+        this.addListener("MotionStarted", listner);
+    };
 
     /**
      * 表情再生
@@ -630,27 +624,26 @@ export class CustomModel extends EventEmitter {
         this.emit("StopSpeak"); //---------------------------------------------
     };
 
-    onModelHit = (listner: (hitArea: string) => void) => {
-        this.addListener("ModelHit", listner);
-    };
-    onStartSpeak = (listner: () => void): void => {
-        this.addListener("StartSpeak", listner);
-    };
-    onStopSpeak = (listner: () => void): void => {
-        this.addListener("StopSpeak", listner);
-    };
-    onModelUpdate = (listner: (deltaTime: number) => void) => {
-        this.addListener("ModelUpdate", listner);
-    };
-    onFinishSpeak = (listner: () => void): void => {
-        this.addListener("FinishSpeak", listner);
-    };
-    onMotionFinished = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
-        this.addListener("MotionFinished", listner);
-    };
-    onMotionStarted = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
-        this.addListener("MotionStarted", listner);
-    };
+    //モデルを格納しているcontainerの左上頂点を基準点として描画したいエリアのx,y,width,heightを指定する
+    // maskRentagle = () => {
+    //     this.container.filters = [new PIXI.filters.AlphaFilter(1)];
+    //     const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+    //     this.container.filterArea = new PIXI.Rectangle(containerGlobal.x + x, containerGlobal.y + y, width, height);
+    //     this.filterX = this.container.x;
+    //     this.filterY = this.container.y;
+    //     this.filterWidth = width;
+    //     this.filterHeight = height;
+    //     this.isFilter = true;
+    // };
+
+    // //座標が四角の範囲内にあるかどうかを計算する
+    // overModelBox = (point: PIXI.Point): boolean => {
+    //     if (point.x >= 0 && point.y >= 0 && point.x <= this.boxWidth && point.y <= this.boxHeight) {
+    //         return true;
+    //     } else {
+    //         return false;
+    //     }
+    // };
 }
 
 // this.model.expression(1);
@@ -690,3 +683,16 @@ export class CustomModel extends EventEmitter {
 //         //this.model.addChild(mask3);
 //         //mask3.position.set(this.model.width, this.model.height);
 //         console.log(mask3.position.x, mask3.position.y);
+
+//     // this.modelBox.scale.set(this.modelBox.scale.x * scaleX, this.modelBox.scale.y * scaleY);
+//     //this.model.scale.set(this.model.scale.x * scaleX, this.model.scale.y * scaleY);
+//     // console.log(this.modelBox.scale);
+//     //this.modelScale = this.modelScale * scaleX;
+//     // this.modelX = this.modelX * scaleX;
+//     // this.modelY = this.modelY * scaleY;
+//     // this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
+//     // this.model.scale.set(this.modelScale, this.modelScale);
+//     console.log(this.boxHeight, this.boxWidth);
+//     console.log(scaleX, scaleY);
+//     this.boxWidth = this.modelBox.width;
+//     this.boxHeight = this.modelBox.height;
