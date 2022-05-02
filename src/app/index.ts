@@ -1,8 +1,7 @@
 import "../css/index.scss";
 import * as bootstrap from "bootstrap";
 import { App } from "./App";
-import * as PIXI from "pixi.js";
-import { Live2DModel, Live2DFactoryOptions } from "pixi-live2d-display";
+import axios from "axios";
 
 {
     // async function init() {
@@ -27,8 +26,32 @@ import { Live2DModel, Live2DFactoryOptions } from "pixi-live2d-display";
     // }
     // init();
     //-- App初期化
-    const app: App = new App();
-    window.addEventListener("load", () => {
+    // const testVOICEVOX = async () => {
+    //     // axios.interceptors.response.use(function (response) {
+    //     //     console.log(response);
+    //     //     return response;
+    //     // }, function (error) {
+    //     //     console.log(error);
+    //     // })
+    //     const rpc = axios.create({ baseURL: "http://localhost:50021", proxy: false });
+    //     //* まずtextを渡してsynthesis宛のパラメータを生成する、textはURLに付けるのでencodeURIで変換しておく。*/
+
+    //     const audio_query = await rpc.post("audio_query?text=" + encodeURI("あいうろ") + "&speaker=1").catch(() => false);
+    //     console.log(audio_query);
+    //     // audio_query.data
+    //     // const testClient = new Client("http://192.168.3.10:40080");
+    //     // const query: Query = await testClient.query.createQuery(1, "あ");
+    // };
+    // testVOICEVOX().catch();
+
+    window.addEventListener("load", async () => {
+        //http://localhost:40080
+        //http://60.130.130.16
+        //http://192.168.3.10:40080
+        const serverURL = "http://192.168.3.10:40080";
+
+        //console.log(audio_query);
+        const app: App = new App(serverURL); //
         app.mount();
     });
     //let app: App | null = null;

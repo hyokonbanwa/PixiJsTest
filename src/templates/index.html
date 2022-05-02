@@ -23,6 +23,11 @@
                 <button type="button" id="shrink" class="col">縮小</button>
             </div>
             <div class="row m-2">
+                <select class ="col" id="selectMotion">
+                </select>
+                <button type="button" id="motionStart" class="col">モーション再生</button>
+            </div>
+            <div class="row m-2">
                 <button type="button" id="normalEx" class="col">ノーマル</button>
                 <button type="button" id="negativeEx" class="col">マイナス</button>
             </div>
@@ -31,14 +36,14 @@
                 <button type="button" id="speakStop" class="col">やめる</button>
             </div>
             <div class="row m-2">
-                <select class ="col-1" id="select">
+                <select class ="col-2" id="selectVoice">
                     <!-- <option value="サンプル1">1</option>
                     <option value="サンプル2">2</option>
                     <option value="サンプル3">3</option>
                     <option value="サンプル3" selected>4</option> -->
                 </select>
-                <input type ="text" id = "textBox" class ="col-8" placeholder = "AIにしゃべらせたい文字列"></input>
-                <button type="button" id="voiceStart" class="col-3">発話</button>
+                <input type ="text" id = "textBox" class ="col-9" placeholder = "AIにしゃべらせたい文字列"></input>
+                <button type="button" id="voiceStart" class="col-1">発話</button>
             </div>
 
         </div>

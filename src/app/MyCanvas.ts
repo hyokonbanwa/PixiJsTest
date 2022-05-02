@@ -1,5 +1,4 @@
 import * as PIXI from "pixi.js";
-import * as PIXILive2D from "pixi-live2d-display";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
 import { Client, Query } from "voicevox-api-client";
@@ -33,9 +32,10 @@ export class MyCanvas {
     private app: PIXI.Application;
     public hiyori: CustomModel;
     private audioContext: AudioContext;
-    private voicevoxClient: Client;
+    private voicevoxClient: Client | null;
+    //private serverConnect: boolean;
     //使うものを列挙する
-    constructor() {
+    constructor(serverConnect: boolean, serverURL?: string) {
         //window.PIXI = PIXI;
         // PIXI.Application.registerPlugin(PIXI.TickerPlugin);
         // Live2DModel.registerTicker(PIXI.Ticker);
@@ -51,15 +51,20 @@ export class MyCanvas {
         };
         this.app = new PIXI.Application(pixiOptions);
         this.audioContext = new AudioContext();
-        //http://localhost:40080
-        //http://60.130.130.16
-        this.voicevoxClient = new Client("http://192.168.3.10:40080");
 
         //550, 900, 0.235, 0, -20 モデル全身/
         //550, 700, 0.45, 0, 500 モデル顔中心
         //225, 350, 0.25, 0, 250
         this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
-        this.hiyori.audioContext = this.audioContext;
+        if (serverConnect === true && serverURL !== void 0) {
+            //http://localhost:40080
+            //http://60.130.130.16
+            //http://192.168.3.10:40080
+            this.voicevoxClient = new Client(serverURL);
+            this.hiyori.audioContext = this.audioContext;
+        } else {
+            this.voicevoxClient = null;
+        }
     }
     //ロード処理と初期配置を書く
     initialize = async () => {
@@ -70,12 +75,12 @@ export class MyCanvas {
         hiyoriModel.y = 500;
         //hiyoriModel.scale.set(1.25, 1.25);
         const stage = this.app.stage;
-        const dai = new PIXI.Graphics();
-        dai.beginFill(0xcc0000).drawRect(0, 0, 500, 500).endFill();
-        dai.x = 100;
-        dai.y = 100;
-        dai.addChild(hiyoriModel);
-        stage.addChild(dai);
+        // const dai = new PIXI.Graphics();
+        // dai.beginFill(0xcc0000).drawRect(0, 0, 500, 500).endFill();
+        // dai.x = 100;
+        // dai.y = 100;
+        //dai.addChild(hiyoriModel);
+        stage.addChild(hiyoriModel);
         this.hiyori.displayBox();
         this.hiyori.hitAreaOn();
         //this.hiyori.hitAreaOff();
@@ -187,9 +192,10 @@ export class MyCanvas {
     };
 
     //VOICEVOXサーバーにリクエストしてAudioBufferをもらう関数
-    playVoice = async (speaker: number, text: string, volumeScale?: number) => {
+    playVoice = async (speaker: number, text: string, volumeScale?: number, speedScale?: number) => {
+        if (this.voicevoxClient === null) return;
         const query: Query = await this.voicevoxClient.query.createQuery(speaker, text);
-        query.speedScale = 1.1;
+        query.speedScale = speedScale ?? 1.0;
         //query.prePhonemeLength = 0.1;
         query.postPhonemeLength = 0.3; //------最後に無音の時間を少し作る
         query.volumeScale = volumeScale ?? 1;
@@ -197,6 +203,25 @@ export class MyCanvas {
         // Web Audio APIで使える形式に変換
         const voiceAudioBufer: AudioBuffer = await this.audioContext.decodeAudioData(voiceArrayBuffer); //「ArrayBuffer」を「AudioBuffer」に変換
         this.hiyori.startVoice(voiceAudioBufer, 15);
+    };
+
+    playWebSpeech = (voice: SpeechSynthesisVoice, text: string, volume?: number) => {
+        window.speechSynthesis.cancel(); //------------------これでwebspeechを止める
+
+        const uttr = new SpeechSynthesisUtterance();
+        uttr.text = text;
+        uttr.volume = volume ?? 1.0;
+        uttr.voice = voice;
+
+        uttr.addEventListener("end", () => {
+            window.speechSynthesis.cancel;
+            this.hiyori.stopSpeak(); //最後まで話し終えたら口パク終了
+        });
+
+        window.speechSynthesis.speak(uttr);
+        window.setTimeout(() => {
+            this.hiyori.startSpeak(1);
+        }, 100);
     };
 
     //時間経過で必要になる処理を加えていく

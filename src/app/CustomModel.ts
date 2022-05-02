@@ -2,8 +2,6 @@ import * as PIXI from "pixi.js";
 import * as PIXILive2D from "pixi-live2d-display";
 import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
-import { VOICEVOXAudio } from "./VOICEVOXAudio";
-import { trace } from "console";
 
 interface DragObject extends PIXI.DisplayObject {
     dragging: boolean;
@@ -599,6 +597,11 @@ export class CustomModel extends EventEmitter {
         if (this.model === null) return console.log("モデルがないです");
         return this.model?.internalModel.motionManager.state;
     }
+    get settings(): CustomModelSettings | void {
+        if (this.model === null) return;
+        const settings: CustomModelSettings = this.model.internalModel.settings;
+        return settings;
+    }
 
     onHitAreaOver = (listner: (hitAreas: string[]) => void) => {
         this.addListener("HitAreaOver", listner);
@@ -648,7 +651,7 @@ export class CustomModel extends EventEmitter {
         //モーショングループ名がsettingsにあるか確認
         const settings: CustomModelSettings = this.model.internalModel.settings;
         const motionGroups: string[] = Object.keys(settings.motions as {}[]);
-        //console.log(motionGroups.includes(group));
+        //ないならキャンセル
         if (motionGroups.includes(group) === false) return console.log(`${group}というMorionGroupは存在しない`);
 
         //--------------------------------------------
