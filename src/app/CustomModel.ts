@@ -9,11 +9,11 @@ interface DragObject extends PIXI.DisplayObject {
 }
 
 interface CustomModelSettings extends PIXILive2D.ModelSettings {
-    expressions?: Object[];
-    groups?: Object[];
-    hitAreas?: Object[];
+    expressions?: any[];
+    groups?: any[];
+    hitAreas?: any[];
     layout?: any;
-    motions?: Object[];
+    motions?: any[];
 }
 /**
  * ToDo
@@ -21,6 +21,7 @@ interface CustomModelSettings extends PIXILive2D.ModelSettings {
  * 任意の図形で切り抜けるようにする
  **/
 //欠陥：モーションに一意の番号が無いので、予約再生時にモーションを区別できない よってgithubからソースを持ってきてMotionStateが一意のキーを持てるようにする必要がある
+//motion(group,number,force)で同じモーションは重ねて再生できない、なのでmotion()のまえにstopAllmotionを入れる必要がある;
 
 //イベント一覧
 //onHitAreaOverでモデルの当たり判定エリアにマウスが乗ったときの動作を追加できる
@@ -31,6 +32,7 @@ interface CustomModelSettings extends PIXILive2D.ModelSettings {
 //onFinishSpeakでボイスが最後まで再生されたときの処理を追加できる。
 //onMotionFinishedでモーションが中断されず最後まで再生されたときの処理を追加できる
 //onMotionStartedでモーションが開始されたときの処理を追加できる
+//onExpressionChangedで表情を変更したときの処理を追加できる
 
 //model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
 
@@ -69,7 +71,7 @@ export class CustomModel extends EventEmitter {
     private voiceVolume: number; //モデルの音量
 
     //表情関係
-    private currentExpression: number | null;
+    private currentExpression: number | string | null;
     private normalExpressionIndex: number | string;
 
     //モーション関係
@@ -172,13 +174,17 @@ export class CustomModel extends EventEmitter {
         setPosition();
 
         const setListener = () => {
-            if (this.model === null) return console.log("モデルがない");
+            if (this.model === null) {
+                throw new Error("モデルがない");
+            }
 
             this.container.interactive = true;
 
             //マウスが動いた時のリスナー登録
             this.container.on("mousemove", (e: PIXI.InteractionEvent) => {
-                if (this.model === null) return console.log("モデルがない");
+                if (this.model === null) {
+                    throw new Error("モデルがない");
+                }
                 //イベント伝播を止める
                 e.stopPropagation();
                 e.stopped = true;
@@ -428,7 +434,9 @@ export class CustomModel extends EventEmitter {
      * @param {number} deltaFrame デルタフレーム
      */
     update = (deltaFrame: number): void => {
-        if (this.model === null) return console.log("モデルがないです");
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
 
         //モデルのアップデート
         const frameRate = 60 / deltaFrame; //フレームレートを求める
@@ -594,7 +602,9 @@ export class CustomModel extends EventEmitter {
         return this._isHit;
     }
     get motionState(): PIXILive2D.MotionState | void {
-        if (this.model === null) return console.log("モデルがないです");
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
         return this.model?.internalModel.motionManager.state;
     }
     get settings(): CustomModelSettings | void {
@@ -627,15 +637,40 @@ export class CustomModel extends EventEmitter {
     onMotionStarted = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
         this.addListener("MotionStarted", listner);
     };
+    onExpressionChanged = (listner: (id: number | string) => void) => {
+        this.addListener("ExpressionChanged", listner);
+    };
 
     /**
      * 表情再生
      * @param {number | string } id? 表情の番号または名前、指定しない場合ランダム
      */
-    setExpression = (id: number): void => {
-        if (this.model === null) return console.log("モデルがないです");
+    setExpression = (id: number | string): void => {
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
+        //表情名がsettingsにあるか確認
+        const settings: CustomModelSettings = this.model.internalModel.settings;
+        const expressions: string[] = (settings.expressions as Object[]).map((currentValue) => {
+            return (currentValue as { Name: string; File: string }).Name;
+        });
+        //ないならキャンセル
+        if (typeof id === "number") {
+            if (expressions.length - 1 < id || id < 0) {
+                {
+                    throw new Error(`「${id}番目」の表情は存在しません。`);
+                }
+            }
+        } else if (typeof id === "string") {
+            if (expressions.includes(id as string) === false) {
+                throw new Error(`「${id}」という表情は存在しません。`);
+            }
+        }
+
+        //表情反映
         this.model.expression(id);
         this.currentExpression = id;
+        this.emit("ExpressionChanged", id);
     };
 
     /**
@@ -646,28 +681,40 @@ export class CustomModel extends EventEmitter {
      * @param {MotionPriority} priority? 再生するモーションの優先度 指定しない　場合MotionPriority.NORMAL
      */
     forceMotion = (group: string, index?: number): void => {
-        if (this.model === null) return console.log("モデルがないです");
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
 
-        //モーショングループ名がsettingsにあるか確認
+        //モーショングループ名とindexがsettingsにあるか確認
         const settings: CustomModelSettings = this.model.internalModel.settings;
         const motionGroups: string[] = Object.keys(settings.motions as {}[]);
+        const moitonIndexes: Object[] = settings.motions !== void 0 ? settings.motions[group as any] : null;
         //ないならキャンセル
-        if (motionGroups.includes(group) === false) return console.log(`${group}というMorionGroupは存在しない`);
+        if (motionGroups.includes(group) === false) {
+            throw new Error(`「${group}」というMorionGroupは存在しない`);
+        }
+        if (index !== void 0) {
+            if (moitonIndexes.length - 1 < index || index < 0) {
+                throw new Error(`${group}に「${index}」番目のモーションはありません。`);
+            }
+        }
 
         //--------------------------------------------
         //モデルにモーションを取らせるとき、表情が反映されないときがある
         //motion()のまえでノーマルの表情に初期化、setTImerで現在の表情をあてはめることで修正できる
         this.model.expression(this.normalExpressionIndex); //表情リセット
 
+        this.model.internalModel.motionManager.stopAllMotions(); //----------------------------------------------これでモーションを止める必要がある
         this.model.motion(group, index, PIXILive2D.MotionPriority.FORCE); //モーション再生
         const currentState = this.model.internalModel.motionManager.state;
+
         this.emit("MotionStarted", currentState.reservedGroup, currentState.reservedIndex, currentState); //---------------------------リスナー
 
         //初期化した表情を修正
         window.setTimeout(() => {
             if (this.currentExpression !== null) {
                 //時間をおいて現在の表情にする
-                this.setExpression(this.currentExpression);
+                this.model?.expression(this.currentExpression);
             }
         }, 10);
     };
@@ -681,8 +728,12 @@ export class CustomModel extends EventEmitter {
      * @param {} speakSpeed 口パク速度　2π x speakSpeed
      */
     startSpeak = (speakSpeed: number): void => {
-        if (this.model === null || speakSpeed < 0) return console.log("モデルがないです");
-        if (speakSpeed < 0) return console.log("無効なspeakSpeed");
+        if (this.model === null || speakSpeed < 0) {
+            throw new Error("モデルがないです");
+        }
+        if (speakSpeed < 0) {
+            throw new Error("無効なspeakSpeed");
+        }
 
         //前の音をとめる
         if (this.voicing === true || this.speaking === true) {
@@ -698,8 +749,12 @@ export class CustomModel extends EventEmitter {
 
     //audioBufferを受け取って音声を再生し、リアルタイムに「audioBuffer」の音量に応じて口パクする
     startVoice = (audioBuffer: AudioBuffer, frequency?: number) => {
-        if (this.model === null) return console.log("モデルがない");
-        if (this._audioContext === null) return console.log("AudioContextがない");
+        if (this.model === null) {
+            throw new Error("モデルがない");
+        }
+        if (this._audioContext === null) {
+            throw new Error("AudioContextがない");
+        }
         //前の音を止める
         if (this.voicing === true || this.speaking === true) {
             this.stopSpeak();
@@ -726,8 +781,12 @@ export class CustomModel extends EventEmitter {
         //再生終了時にstop()するリスナー登録
         //-------------------------------------------------------ここで登録されたリスナーはAudioSourceNode.stop()時にじっこうさせるので注意
         this.voiceSource.addEventListener("ended", (e: Event) => {
-            if (this._audioContext === null || this.voiceSource === null) return console.log("無効なended");
-            if (this.voiceSource.buffer === null) return console.log("モデルにAudioBufferがセットされていない");
+            if (this._audioContext === null || this.voiceSource === null) {
+                throw new Error("無効なended");
+            }
+            if (this.voiceSource.buffer === null) {
+                throw new Error("モデルにAudioBufferがセットされていない");
+            }
 
             //console.log("AudioNodeストップ");
             if (this.voiceSource.buffer?.duration <= this._audioContext.currentTime - startVoiceTime && this.intervalVoiceID !== null) {
@@ -770,8 +829,12 @@ export class CustomModel extends EventEmitter {
      * 話すのをやめる
      */
     stopSpeak = (): void => {
-        if (this.model === null) return console.log("モデルがないです");
-        if (this.speaking === false && this.voicing === false) return console.log("話していないので何もしない");
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
+        if (this.speaking === false && this.voicing === false) {
+            throw new Error("話していないので何もしない");
+        }
         //
         //前の音を止める
         if (this.voicing === true && this.intervalVoiceID !== null) {

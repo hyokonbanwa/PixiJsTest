@@ -1,21 +1,27 @@
 import { MyCanvas } from "./MyCanvas";
 import * as PIXILive2D from "pixi-live2d-display";
 import axios from "axios";
+import { ModelPosition } from "./types";
+import { Mode } from "fs";
 interface CustomModelSettings extends PIXILive2D.ModelSettings {
-    expressions?: Object[];
-    groups?: Object[];
-    hitAreas?: Object[];
+    expressions?: any[];
+    groups?: any[];
+    hitAreas?: any[];
     layout?: any;
-    motions?: Object[];
+    motions?: any[];
 }
 export class App {
     private pixiCanvas: MyCanvas | null;
     private serverURL: string;
     private serverConnect: boolean;
-    constructor(serverURL: string) {
+    private debug: boolean;
+    private modelPosition: ModelPosition;
+    constructor(debug: boolean, serverURL: string, modelPosition: ModelPosition) {
         this.pixiCanvas = null;
         this.serverConnect = false;
         this.serverURL = serverURL;
+        this.debug = debug;
+        this.modelPosition = modelPosition;
     }
     mount = async () => {
         console.log("Appマウント");
@@ -28,7 +34,7 @@ export class App {
             .catch(() => false);
         console.log("サーバーコネクト：" + this.serverConnect);
 
-        this.pixiCanvas = new MyCanvas(this.serverConnect, this.serverURL);
+        this.pixiCanvas = new MyCanvas(this.debug, this.serverConnect, this.serverURL, this.modelPosition);
 
         //windowAudioContext構成
         window.AudioContext = window.AudioContext ?? window.webkitAudioContext;
@@ -114,16 +120,16 @@ export class App {
             box.scale.set(box.scale.x * 0.9, box.scale.y * 0.9);
         });
 
-        const startButton = document.getElementById("speakStart") as HTMLElement;
-        startButton.addEventListener("click", (e: MouseEvent) => {
+        const startSpeak = document.getElementById("speakStart") as HTMLElement;
+        startSpeak.addEventListener("click", (e: MouseEvent) => {
             e.preventDefault();
             if (this.pixiCanvas === null) return;
             window.speechSynthesis.pause(); //------------------これでwebspeechを止める
             this.pixiCanvas.hiyori.startSpeak(1);
         });
 
-        const stopButton = document.getElementById("speakStop") as HTMLElement;
-        stopButton.addEventListener("click", (e: MouseEvent) => {
+        const stopSoeak = document.getElementById("speakStop") as HTMLElement;
+        stopSoeak.addEventListener("click", (e: MouseEvent) => {
             e.preventDefault();
             if (this.pixiCanvas === null) return;
             this.pixiCanvas.hiyori.stopSpeak();
@@ -175,12 +181,32 @@ export class App {
             //あいうえお。かきくけこ。
         });
 
-        //pixiアプリ初期化
+        //------------------------------------------------------------pixiアプリ初期化
         await this.pixiCanvas.initialize();
 
         const modelSettings: CustomModelSettings = this.pixiCanvas.hiyori.settings as CustomModelSettings;
 
-        console.log(modelSettings);
+        //モーションのセレクトボックス作成
+        const selectBoxMotion = document.getElementById("selectMotion") as HTMLSelectElement;
+        const motionNum = Object.keys((modelSettings?.motions as { All?: Object }).All as unknown as {}[]).length;
+
+        for (let i: number = 0; i < motionNum; i++) {
+            let select = document.createElement("option");
+            select.innerText = `All：${i}`;
+            if (i === 0) {
+                select.selected = true;
+            }
+            selectBoxMotion.appendChild(select);
+        }
+
+        const startMotion = document.getElementById("startMotion") as HTMLElement;
+        startMotion.addEventListener("click", (e: MouseEvent) => {
+            e.preventDefault();
+            if (this.pixiCanvas === null) return;
+            this.pixiCanvas.hiyori.forceMotion("All", selectBoxMotion.selectedIndex);
+            //console.log("再生");
+            //this.pixiCanvas.hiyori.idleGroup = "All";
+        });
 
         //const voiceStop = document.getElementById("voiceStop") as HTMLElement;
         // voiceStop.addEventListener("click", (e: MouseEvent) => {
@@ -188,5 +214,10 @@ export class App {
         //     // this.pixiCanvas.hiyori.container.width = 500;
         //     // this.pixiCanvas.hiyori.container.height = 1000;
         // });
+    };
+
+    unmount = () => {
+        this.pixiCanvas?.destoroy();
+        window.speechSynthesis.cancel();
     };
 }

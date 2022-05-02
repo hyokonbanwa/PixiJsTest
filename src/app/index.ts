@@ -1,58 +1,37 @@
 import "../css/index.scss";
 import * as bootstrap from "bootstrap";
 import { App } from "./App";
-import axios from "axios";
-
+import { ModelPosition } from "./types";
+export {};
 {
-    // async function init() {
-    //     const pixiOptions = {
-    //         width: 1000,
-    //         height: 1000,
-    //         view: document.getElementById("myCanvas") as HTMLCanvasElement,
-    //         transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
-    //     };
-    //     const app = new PIXI.Application(pixiOptions);
-    //     const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
-    //     app.stage.addChild(food);
-    //     const modelOptions: Live2DFactoryOptions = {
-    //         autoUpdate: false,
-    //     };
-    //     const model = (await Live2DModel.from("/Resources/Hiyori/Hiyori.model3.json", modelOptions)) as unknown as PIXI.DisplayObject & Live2DModel;
-    //     model.x = 500;
-    //     model.y = 500;
-    //     app.stage.addChild(model);
-    //     const ticker = new PIXI.Ticker();
-    //     ticker.add(() => model.update(ticker.elapsedMS));
-    // }
-    // init();
-    //-- App初期化
-    // const testVOICEVOX = async () => {
-    //     // axios.interceptors.response.use(function (response) {
-    //     //     console.log(response);
-    //     //     return response;
-    //     // }, function (error) {
-    //     //     console.log(error);
-    //     // })
-    //     const rpc = axios.create({ baseURL: "http://localhost:50021", proxy: false });
-    //     //* まずtextを渡してsynthesis宛のパラメータを生成する、textはURLに付けるのでencodeURIで変換しておく。*/
+    //http://localhost:40080
+    //http://60.130.130.16
+    //http://192.168.3.10:40080
+    const serverURL = "http://192.168.3.10:40080";
+    const debug: boolean = false;
 
-    //     const audio_query = await rpc.post("audio_query?text=" + encodeURI("あいうろ") + "&speaker=1").catch(() => false);
-    //     console.log(audio_query);
-    //     // audio_query.data
-    //     // const testClient = new Client("http://192.168.3.10:40080");
-    //     // const query: Query = await testClient.query.createQuery(1, "あ");
-    // };
-    // testVOICEVOX().catch();
+    //550, 900, 0.235, 0, -20 モデル全身/
+    //550, 700, 0.45, 0, 500 モデル顔中心
+    //225, 350, 0.25, 0, 250
+    const position: ModelPosition = {
+        boxWidth: 550,
+        boxHeight: 700,
+        modelScale: 0.45,
+        modelX: 0,
+        modelY: 500,
+    };
 
-    window.addEventListener("load", async () => {
-        //http://localhost:40080
-        //http://60.130.130.16
-        //http://192.168.3.10:40080
-        const serverURL = "http://192.168.3.10:40080";
+    let app: App;
 
+    window.addEventListener("load", () => {
         //console.log(audio_query);
-        const app: App = new App(serverURL); //
+        app = new App(debug, serverURL, position); //
         app.mount();
+    });
+
+    window.addEventListener("beforeunload", () => {
+        console.log("アンロード");
+        app.unmount();
     });
     //let app: App | null = null;
     // DOMContentLoadedだと発火されないときがある;

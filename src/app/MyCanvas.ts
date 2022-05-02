@@ -2,6 +2,7 @@ import * as PIXI from "pixi.js";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
 import { Client, Query } from "voicevox-api-client";
+import { ModelPosition } from "./types";
 //import { threadId } from "worker_threads";
 // declare global {
 //     interface Window {
@@ -33,9 +34,11 @@ export class MyCanvas {
     public hiyori: CustomModel;
     private audioContext: AudioContext;
     private voicevoxClient: Client | null;
+    private debug: boolean;
     //private serverConnect: boolean;
     //使うものを列挙する
-    constructor(serverConnect: boolean, serverURL?: string) {
+    constructor(debug: boolean, serverConnect: boolean, serverURL: string, modelPosition: ModelPosition) {
+        this.debug = debug;
         //window.PIXI = PIXI;
         // PIXI.Application.registerPlugin(PIXI.TickerPlugin);
         // Live2DModel.registerTicker(PIXI.Ticker);
@@ -44,10 +47,10 @@ export class MyCanvas {
             width: 1000,
             height: 1000,
             view: document.getElementById("myCanvas") as HTMLCanvasElement,
-            backgroundColor: 0x000099,
+            backgroundColor: debug === true ? 0x000099 : void 0,
             resolution: window.devicePixelRatio || 1,
             //autoDensity: true,
-            //transparent: true, //http://runstant.com/pentamania/projects/82dc0e31
+            transparent: debug === true ? false : true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
         this.audioContext = new AudioContext();
@@ -55,7 +58,7 @@ export class MyCanvas {
         //550, 900, 0.235, 0, -20 モデル全身/
         //550, 700, 0.45, 0, 500 モデル顔中心
         //225, 350, 0.25, 0, 250
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", 550, 700, 0.45, 0, 500);
+        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, 500);
         if (serverConnect === true && serverURL !== void 0) {
             //http://localhost:40080
             //http://60.130.130.16
@@ -66,6 +69,7 @@ export class MyCanvas {
             this.voicevoxClient = null;
         }
     }
+
     //ロード処理と初期配置を書く
     initialize = async () => {
         await this.hiyori.makeModel();
@@ -81,8 +85,10 @@ export class MyCanvas {
         // dai.y = 100;
         //dai.addChild(hiyoriModel);
         stage.addChild(hiyoriModel);
-        this.hiyori.displayBox();
-        this.hiyori.hitAreaOn();
+        if (this.debug === true) {
+            this.hiyori.displayBox();
+            this.hiyori.hitAreaOn();
+        }
         //this.hiyori.hitAreaOff();
 
         this.hiyori.idleGroup = "Idle"; //ひよりの通常時のモーショングループ
@@ -93,7 +99,7 @@ export class MyCanvas {
             if (hitArea === "Body") {
                 //話している最中はタッチに反応しない
                 if (this.hiyori.isSpeaking === false && this.hiyori.isVoicing === false) {
-                    this.hiyori.forceMotion("TapBody", undefined);
+                    this.hiyori.forceMotion("TapBody", void 0);
                     console.log("モデルヒット：" + hitArea);
                 }
             }
@@ -105,7 +111,7 @@ export class MyCanvas {
 
         //モデルが話始めたときの処理
         this.hiyori.onStartSpeak(() => {
-            this.hiyori.forceMotion("StartSpeak", undefined);
+            this.hiyori.forceMotion("StartSpeak", void 0);
             this.hiyori.idleGroup = "StartSpeak";
             console.log("口パク、または発話始め。");
         });
@@ -153,8 +159,29 @@ export class MyCanvas {
             console.log(`「${currentGroup}」グループの、「${currentIndex}」番目のモーションが開始`);
         });
 
-        this.addUpdate();
+        this.hiyori.onExpressionChanged((id: string | number) => {
+            if (typeof id === "string") {
+                console.log(`「${id}」という表情に切り替え。`);
+            }
+            if (typeof id === "number") {
+                console.log(`「${id}番目」の表情に切り替え。`);
+            }
+        });
 
+        //時間経過で必要になる処理を加えていく
+        const addUpdate = () => {
+            this.app.ticker.add(this.hiyori.update);
+            // if (this.hiyori.model != null) {
+            //     //this.app.ticker.add(() => this.hiyori?.model?.update(this.app.ticker.elapsedMS));
+            //     // this.app.ticker.add((delta) => {
+            //     //     //console.log(params);
+            //     //     //deltaとelapsedmsの違い　https://www.html5gamedevs.com/topic/36268-pixiticker-deltatime-vs-elapsedms/
+            //     //     console.log("デルタ:" + delta); //1秒間に60FPSを基準として前回のフレームから何フレーム分更新したか、60fpsでのフレーム単位の処理を書く 1Frame /(144FPS / 60FPS) = 0.42Frame
+            //     //     console.log(this.app.ticker.elapsedMS); //前回のフレームから何ms更新したか 1000ms/ 144 = 7ms、ミリ秒単位の処理を書く
+            //     // });
+            // }
+        };
+        addUpdate();
         //const widget = new PIXI.
         // const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
         // this.app.stage.addChild(food);
@@ -224,18 +251,8 @@ export class MyCanvas {
         }, 100);
     };
 
-    //時間経過で必要になる処理を加えていく
-    addUpdate = () => {
-        this.app.ticker.add(this.hiyori.update);
-        // if (this.hiyori.model != null) {
-        //     //this.app.ticker.add(() => this.hiyori?.model?.update(this.app.ticker.elapsedMS));
-        //     // this.app.ticker.add((delta) => {
-        //     //     //console.log(params);
-        //     //     //deltaとelapsedmsの違い　https://www.html5gamedevs.com/topic/36268-pixiticker-deltatime-vs-elapsedms/
-        //     //     console.log("デルタ:" + delta); //1秒間に60FPSを基準として前回のフレームから何フレーム分更新したか、60fpsでのフレーム単位の処理を書く 1Frame /(144FPS / 60FPS) = 0.42Frame
-        //     //     console.log(this.app.ticker.elapsedMS); //前回のフレームから何ms更新したか 1000ms/ 144 = 7ms、ミリ秒単位の処理を書く
-        //     // });
-        // }
+    destoroy = (): void => {
+        this.app.destroy();
     };
 }
 
