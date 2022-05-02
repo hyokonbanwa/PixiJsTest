@@ -37,7 +37,7 @@ export class MyCanvas {
     private debug: boolean;
     //private serverConnect: boolean;
     //使うものを列挙する
-    constructor(debug: boolean, serverConnect: boolean, serverURL: string, modelPosition: ModelPosition) {
+    constructor(debug: boolean, serverConnect: boolean, serverURL: string, modelPath: string, modelPosition: ModelPosition) {
         this.debug = debug;
         //window.PIXI = PIXI;
         // PIXI.Application.registerPlugin(PIXI.TickerPlugin);
@@ -58,7 +58,8 @@ export class MyCanvas {
         //550, 900, 0.235, 0, -20 モデル全身/
         //550, 700, 0.45, 0, 500 モデル顔中心
         //225, 350, 0.25, 0, 250
-        this.hiyori = new CustomModel("/Resources/Hiyori_2/Hiyori.model3.json", "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, 500);
+        ("/Resources/Hiyori_2/Hiyori.model3.json");
+        this.hiyori = new CustomModel(modelPath, "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, 500);
         if (serverConnect === true && serverURL !== void 0) {
             //http://localhost:40080
             //http://60.130.130.16

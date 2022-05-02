@@ -47,29 +47,57 @@
             </div>
 
         </div>
-        <!-- <canvas id="canvas"></canvas> -->
-        <!-- <script>
-            const cubism2Model = "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json";
-            const cubism4Model = "../Resources/Hiyori/Hiyori.model3.json";
+        <script>
+                        //http://localhost:40080
+            //http://60.130.130.16
+            //http://192.168.3.10:40080
+            const serverURL = "http://192.168.3.10:40080";
+            const debug = false;
+            const modelPath = "/Resources/Hiyori_2/Hiyori.model3.json";
 
-            (async function main() {
-                const app = new PIXI.Application({
-                    view: document.getElementById("canvas"),
-                    autoStart: true,
-                    resizeTo: window,
-                });
+            //550, 900, 0.235, 0, -20 モデル全身/
+            //550, 700, 0.45, 0, 500 モデル顔中心
+            //225, 350, 0.25, 0, 250
+            const position = {
+                boxWidth: 550,
+                boxHeight: 700,
+                modelScale: 0.45,
+                modelX: 0,
+                modelY: 500,
+            };
+            let indexLibrary = null;
 
-                const model2 = await PIXI.live2d.Live2DModel.from(cubism2Model);
-                const model4 = await PIXI.live2d.Live2DModel.from(cubism4Model);
+            document.addEventListener(
+                "DOMContentLoaded",
+                () => {
 
-                app.stage.addChild(model2);
-                app.stage.addChild(model4);
+                    
+                    // indexLibrary.addEventListener("finish", () => {
+                    //     console.log("リスナー");
+                    //     console.log(myLibrary.getResult());
+                    // });
 
-                model2.scale.set(0.3);
-                model4.scale.set(0.25);
+                    // myLibrary.onload();
+                },
+                false
+            );
 
-                model4.x = 300;
-            })();
-        </script> -->
+            //--- cubism SDK 初期化
+            window.addEventListener(
+                "load",
+                () => {
+                    console.log("ロード");
+                    indexLibrary = new IndexLibrary(debug,serverURL,modelPath,position);
+                    indexLibrary.onload();
+                },
+                false
+            );
+            //-
+
+            window.addEventListener("beforeunload",()=>{
+                console.log("アンロード");
+                indexLibrary.onUnload();
+            });
+        </script>
     </body>
 </html>

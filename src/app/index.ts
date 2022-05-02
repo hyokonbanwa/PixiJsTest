@@ -9,6 +9,7 @@ export {};
     //http://192.168.3.10:40080
     const serverURL = "http://192.168.3.10:40080";
     const debug: boolean = false;
+    const modelPath = "/Resources/Hiyori_2/Hiyori.model3.json";
 
     //550, 900, 0.235, 0, -20 モデル全身/
     //550, 700, 0.45, 0, 500 モデル顔中心
@@ -25,7 +26,7 @@ export {};
 
     window.addEventListener("load", () => {
         //console.log(audio_query);
-        app = new App(debug, serverURL, position); //
+        app = new App(debug, serverURL, modelPath, position); //
         app.mount();
     });
 

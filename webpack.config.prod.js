@@ -35,6 +35,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const HtmlWebpackHarddiskPlugin = require("html-webpack-harddisk-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
+//const webpack = require("webpack");
 //const { CleanWebpackPlugin } = require("clean-webpack-plugin");//Webpack5では要らない代わりにoutput.clean = true を使う
 
 // [定数] webpack の出力オプションを指定します
@@ -42,12 +43,12 @@ const CopyPlugin = require("copy-webpack-plugin");
 //
 const MODE = "production";
 // CSSソースマップの利用有無(productionのときはソースマップを利用しない)
-const enabledSourceMap = MODE === "production";
+const enabledSourceMap = MODE === "development";
 let enableDevTool;
 let publicPath;
 if (MODE === "development") {
     enableDevTool = "inline-source-map";
-    publicPath = "./";
+    publicPath = "/";
 } else {
     enableDevTool = false;
     publicPath = undefined;
@@ -66,17 +67,17 @@ const app = {
 
     // メインとなるJavaScriptファイル（エントリーポイント）
     entry: {
-        SectionOmote: {
-            import: path.resolve(__dirname, "src/indexApp/SectionOmote.ts"),
+        IndexLibrary: {
+            import: path.resolve(__dirname, "src/app/IndexLibrary.ts"),
             library: {
                 // all options under `output.library` can be used here
-                name: "SectionOmote",
+                name: "IndexLibrary",
                 type: "umd",
                 umdNamedDefine: true,
                 export: "default",
             },
         },
-        test: path.resolve(__dirname, "src/testApp/test.ts"),
+        //index: path.resolve(__dirname, "src/app/index.ts"),
     },
 
     /*
@@ -232,20 +233,20 @@ const app = {
             template: path.resolve(__dirname, "src/templates/index.html"), //どのhtmlを使うか
             inject: "head", //どこにスクリプト配置するか
             scriptLoading: "defer", //スクリプトの読み込み属性
-            chunks: ["SectionOmote"], //どのエントリーキー=生成されるjsファイルを使うか
+            chunks: ["IndexLibrary"], //どのエントリーキー=生成されるjsファイルを使うか
             alwaysWriteToDisk: true, //サーバー起動時htmlの変更でホットリロードする　https://qiita.com/kesoji/items/17be4578727aa5023fe8
             //publicPath:
         }),
-        new HtmlWebpackPlugin({
-            filename: "test.html",
-            //publicPath: "dist/",
-            template: path.resolve(__dirname, "src/templates/test.html"),
-            inject: "head",
-            scriptLoading: "defer",
-            chunks: ["test"],
-            alwaysWriteToDisk: true,
-            //publicPath:
-        }),
+        // new HtmlWebpackPlugin({
+        //     filename: "test.html",
+        //     //publicPath: "dist/",
+        //     template: path.resolve(__dirname, "src/templates/test.html"),
+        //     inject: "head",
+        //     scriptLoading: "defer",
+        //     chunks: ["test"],
+        //     alwaysWriteToDisk: true,
+        //     //publicPath:
+        // }),
 
         new HtmlWebpackHarddiskPlugin(), //ホットリロード用プラグイン
 
@@ -261,6 +262,7 @@ const app = {
 
         //dist内の余計なファイルを除去する
         //new CleanWebpackPlugin(),
+        //new webpack.HotModuleReplacementPlugin(),
     ],
 
     resolve: {
@@ -274,10 +276,10 @@ const app = {
         //: import時のaliasを設定するときはWebpack、TypeScript、ESLintの3つを対応しなければならない件
         //https://qiita.com/Statham/items/8a1161c7816e360590f3
         //https://na-ginnan.com/react-webpack-path-config/
-        alias: {
-            "@framework": path.resolve(__dirname, "./src/cubism/Framework/src"), //import文で指定できる
-            //Mymodule: path.resolve(__dirname, "./src/indexApp/myTypes.ts"),
-        },
+        // alias: {
+        //     "@/Live2DModel": path.resolve(__dirname, "/node_modules/pixi-live2d-display/src/Live2DModel.ts"), //import文で指定できる
+        //     //     //Mymodule: path.resolve(__dirname, "./src/indexApp/myTypes.ts"),
+        // },
     },
 
     // ローカル開発用環境を立ち上げる
@@ -287,7 +289,15 @@ const app = {
         open: "/", //"/index.html", //true,
         static: {
             directory: path.join(__dirname, "dist"), //サーバーのルートディレクトリ「ルート/dist/」となる
+
+            //ホットリロード有効化
+            //outputのpathとdevServerのcontentBaseを同じにする
+            //outputのpublicPathとdevServerのpublicPathを同じにする
+            //https://zukucode.com/2017/04/vue-webpack-hmr.html#:~:text=output%E3%81%AEpath%E3%81%A8devServer,publicPath%E3%82%92%E5%90%8C%E3%81%98%E3%81%AB%E3%81%99%E3%82%8B
+            publicPath: publicPath,
         },
+        hot: true,
+
         //host: "0.0.0.0",
 
         /*         static: [
@@ -302,16 +312,16 @@ const app = {
           ], */
 
         //https://webpack.js.org/configuration/dev-server/#websocketurl
-        client: {
-            webSocketURL: {
-                hostname: "0.0.0.0",
-                pathname: "/ws",
-                password: "dev-server",
-                port: 8080,
-                protocol: "ws",
-                username: "webpack",
-            },
-        },
+        // client: {
+        //     webSocketURL: {
+        //         hostname: "0.0.0.0",
+        //         pathname: "/ws",
+        //         password: "dev-server",
+        //         port: 8080,
+        //         protocol: "ws",
+        //         username: "webpack",
+        //     },
+        // },
     },
 
     // //https://webpack.js.org/configuration/dev-server/#websocketurl

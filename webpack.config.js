@@ -67,17 +67,17 @@ const app = {
 
     // メインとなるJavaScriptファイル（エントリーポイント）
     entry: {
-        // SectionOmote: {
-        //     import: path.resolve(__dirname, "src/indexApp/SectionOmote.ts"),
-        //     library: {
-        //         // all options under `output.library` can be used here
-        //         name: "SectionOmote",
-        //         type: "umd",
-        //         umdNamedDefine: true,
-        //         export: "default",
-        //     },
-        // },
-        index: path.resolve(__dirname, "src/app/index.ts"),
+        IndexLibrary: {
+            import: path.resolve(__dirname, "src/app/IndexLibrary.ts"),
+            library: {
+                // all options under `output.library` can be used here
+                name: "IndexLibrary",
+                type: "umd",
+                umdNamedDefine: true,
+                export: "default",
+            },
+        },
+        //index: path.resolve(__dirname, "src/app/index.ts"),
     },
 
     /*
@@ -233,7 +233,7 @@ const app = {
             template: path.resolve(__dirname, "src/templates/index.html"), //どのhtmlを使うか
             inject: "head", //どこにスクリプト配置するか
             scriptLoading: "defer", //スクリプトの読み込み属性
-            chunks: ["index"], //どのエントリーキー=生成されるjsファイルを使うか
+            chunks: ["IndexLibrary"], //どのエントリーキー=生成されるjsファイルを使うか
             alwaysWriteToDisk: true, //サーバー起動時htmlの変更でホットリロードする　https://qiita.com/kesoji/items/17be4578727aa5023fe8
             //publicPath:
         }),

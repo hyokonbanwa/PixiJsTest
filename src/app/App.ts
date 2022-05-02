@@ -2,7 +2,6 @@ import { MyCanvas } from "./MyCanvas";
 import * as PIXILive2D from "pixi-live2d-display";
 import axios from "axios";
 import { ModelPosition } from "./types";
-import { Mode } from "fs";
 interface CustomModelSettings extends PIXILive2D.ModelSettings {
     expressions?: any[];
     groups?: any[];
@@ -16,12 +15,14 @@ export class App {
     private serverConnect: boolean;
     private debug: boolean;
     private modelPosition: ModelPosition;
-    constructor(debug: boolean, serverURL: string, modelPosition: ModelPosition) {
+    private modelPath: string;
+    constructor(debug: boolean, serverURL: string, modelPath: string, modelPosition: ModelPosition) {
         this.pixiCanvas = null;
         this.serverConnect = false;
         this.serverURL = serverURL;
         this.debug = debug;
         this.modelPosition = modelPosition;
+        this.modelPath = modelPath;
     }
     mount = async () => {
         console.log("Appマウント");
@@ -34,7 +35,7 @@ export class App {
             .catch(() => false);
         console.log("サーバーコネクト：" + this.serverConnect);
 
-        this.pixiCanvas = new MyCanvas(this.debug, this.serverConnect, this.serverURL, this.modelPosition);
+        this.pixiCanvas = new MyCanvas(this.debug, this.serverConnect, this.serverURL, this.modelPath, this.modelPosition);
 
         //windowAudioContext構成
         window.AudioContext = window.AudioContext ?? window.webkitAudioContext;
