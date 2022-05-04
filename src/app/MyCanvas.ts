@@ -62,7 +62,7 @@ export class MyCanvas {
         //550, 700, 0.45, 0, 500 モデル顔中心
         //225, 350, 0.25, 0, 250
         ("/Resources/Hiyori_2/Hiyori.model3.json");
-        this.hiyori = new CustomModel(modelPath, "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, 500);
+        this.hiyori = new CustomModel(modelPath, "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, modelPosition.modelY);
         if (serverConnect === true && serverURL !== void 0) {
             //http://localhost:40080
             //http://192.168.3.10:40080
@@ -190,10 +190,11 @@ export class MyCanvas {
         const range = new Range(600, 30, 36);
         stage.addChild(range.range);
         range.range.x = 500;
-        range.range.y = 950;
+        range.range.y = 965;
         range.addEventListener("change", () => {
             //console.log(range.step);
             hiyoriModel.angle = range.step * 10;
+            //console.log(hiyoriModel.angle)
         });
         // // 角丸四角形を描く
         // const roundBox = new PIXI.Graphics();

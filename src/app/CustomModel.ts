@@ -44,6 +44,7 @@ export class CustomModel extends EventEmitter {
     public container: PIXI.Container; //モデルと枠を格納するコンテナ
     private containerScaleX: number; //コンテナの大きさ倍率x
     private containerScaleY: number; //コンテナの大きさ倍率y
+    private containerAngle: number;
 
     private modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
@@ -112,6 +113,7 @@ export class CustomModel extends EventEmitter {
         this.boxHeight = boxHeight;
         this.containerScaleX = 1.0;
         this.containerScaleY = 1.0;
+        this.containerAngle = 0;
         this.modelBox = new PIXI.Graphics();
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.pivot.set(this.boxWidth / 2, this.boxHeight / 2);
@@ -447,7 +449,7 @@ export class CustomModel extends EventEmitter {
         this.model?.update(elapsedMs);
 
         //拡大縮小回転に対応
-        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y || this.container.angle !== 0) {
+        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y || this.containerAngle !== this.container.angle) {
             //コンテナの現在の倍率：変わる前の倍率を求める
             const currentExRateX = this.container.scale.x / this.containerScaleX;
             const currentExRateY = this.container.scale.y / this.containerScaleY;
@@ -466,6 +468,7 @@ export class CustomModel extends EventEmitter {
             //現在のコンテナの倍率を記憶
             this.containerScaleX = this.container.scale.x;
             this.containerScaleY = this.container.scale.y;
+            this.containerAngle = this.container.angle;
         }
 
         //アルファフィルターでモデルをカット
