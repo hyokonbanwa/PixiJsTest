@@ -5,7 +5,6 @@ import { ModelPosition } from "./types";
 export {};
 {
     //http://localhost:40080
-    //http://60.130.130.16
     //http://192.168.3.10:40080
     const serverURL = "http://192.168.3.10:40080";
     const debug: boolean = false;

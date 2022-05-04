@@ -5,7 +5,6 @@ import { HitAreaFrames } from "./HitAreaFrames";
 
 interface DragObject extends PIXI.DisplayObject {
     dragging: boolean;
-    data: PIXI.InteractionData | null;
 }
 
 interface CustomModelSettings extends PIXILive2D.ModelSettings {
@@ -23,6 +22,10 @@ interface CustomModelSettings extends PIXILive2D.ModelSettings {
 //欠陥：モーションに一意の番号が無いので、予約再生時にモーションを区別できない よってgithubからソースを持ってきてMotionStateが一意のキーを持てるようにする必要がある
 //motion(group,number,force)で同じモーションは重ねて再生できない、なのでmotion()のまえにstopAllmotionを入れる必要がある;
 
+//音を再生させたいとき
+//1.{CustomModel}.audioContext = {AudioContext} で設定
+//2,{CustomModel}.startSpeak({AudioBuffer}) で発声に合わせて口パクできる
+
 //イベント一覧
 //onHitAreaOverでモデルの当たり判定エリアにマウスが乗ったときの動作を追加できる
 //onModelHitでモデルをクリックしたときの動作を追加できる。
@@ -32,17 +35,15 @@ interface CustomModelSettings extends PIXILive2D.ModelSettings {
 //onFinishSpeakでボイスが最後まで再生されたときの処理を追加できる。
 //onMotionFinishedでモーションが中断されず最後まで再生されたときの処理を追加できる
 //onMotionStartedでモーションが開始されたときの処理を追加できる
-//onExpressionChangedで表情を変更したときの処理を追加できる
-
-//model3.jsonファイルで「当たり判定エリア名(HitAreas)」と「あるエリアをタップした時のMotionGoup名」と、を同じにしておく
+//onExpressionSettedで表情を設定したときの処理を追加できる
 
 export class CustomModel extends EventEmitter {
     //モデルがマウスを追うかどうかを決める
     public mouseLooking: boolean;
 
     public container: PIXI.Container; //モデルと枠を格納するコンテナ
-    private containerScaleX: number;
-    private containerScaleY;
+    private containerScaleX: number; //コンテナの大きさ倍率x
+    private containerScaleY: number; //コンテナの大きさ倍率y
 
     private modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
@@ -55,7 +56,8 @@ export class CustomModel extends EventEmitter {
     //モデル関係
     private modelPath: string; //model3.jsonの位置
     private model: (PIXI.Sprite & PIXILive2D.Live2DModel) | null; //Live2DModelインスタンス
-    private modelScale: number; //モデルの表示倍率
+    private modelScaleX: number; //モデルの表示倍率
+    private modelScaleY: number;
     //modelBox中心からどれだけずれるかxyで決める
     private modelX: number; //枠の中心からのオフセットx
     private modelY: number; //枠の中心からのオフセットy
@@ -77,14 +79,14 @@ export class CustomModel extends EventEmitter {
     //モーション関係
     private motionFinished: boolean; //モデルが前のフレームでアップデートされていたかどうか
     private _dragging: boolean; //drag中であるかを表す
-    private _draggable: boolean;
+    private _draggable: boolean; //このモデルをドラッグできるようにするかを決める
     // private reservedPriority: string;
     // private reservedIndex: string;
 
     //音声再生関係;
-    private intervalVoiceID: number | null;
-    private _audioContext: AudioContext | null;
-    private voiceSource: AudioBufferSourceNode | null;
+    private intervalVoiceID: number | null; //音声解析する際のインターナルタイマー
+    private _audioContext: AudioContext | null; //AudioContext
+    private voiceSource: AudioBufferSourceNode | null; //受け取ったaudioBufferをセットするAudioBufferSourceNode
 
     /**
      *モデルの設定の初期化
@@ -112,6 +114,8 @@ export class CustomModel extends EventEmitter {
         this.containerScaleY = 1.0;
         this.modelBox = new PIXI.Graphics();
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
+        this.modelBox.pivot.set(this.boxWidth / 2, this.boxHeight / 2);
+        this.modelBox.position.set(this.boxWidth / 2, this.boxHeight / 2);
         this.modelBox.alpha = 0;
         this.container.addChild(this.modelBox);
 
@@ -121,7 +125,8 @@ export class CustomModel extends EventEmitter {
         this.model = null;
         // let model: PIXILive2D.Live2DModel;
         // model.on = (await PIXILive2D.Live2DModel.from(this.modelPath))
-        this.modelScale = modelScale ?? 1;
+        this.modelScaleX = modelScale ?? 1;
+        this.modelScaleY = modelScale ?? 1;
         this.modelX = modelX ?? 0;
         this.modelY = modelY ?? 0;
 
@@ -162,7 +167,7 @@ export class CustomModel extends EventEmitter {
         const setPosition = () => {
             if (this.model !== null) {
                 this.model.anchor.set(0.5, 0.5);
-                this.model.scale.set(this.modelScale, this.modelScale);
+                this.model.scale.set(this.modelScaleX, this.modelScaleY);
 
                 this.model.position.set(this.boxWidth / 2 + this.modelX, this.boxHeight / 2 + this.modelY);
                 //console.log(`このモデルの高さは${this.model.height}、横幅は${this.model.width}`);
@@ -234,6 +239,7 @@ export class CustomModel extends EventEmitter {
                 }
             });
 
+            //ドラッ時の処理を追加
             let offsetX: number | null;
             let offsetY: number | null;
             const onDragStart = (event: PIXI.InteractionEvent): void => {
@@ -244,7 +250,6 @@ export class CustomModel extends EventEmitter {
                 //this._draggable = false　なら実行しない
                 if (this._isBoxOn === false || this._draggable === false) return;
                 const target: DragObject = event.currentTarget as DragObject;
-                target.data = event.data;
 
                 target.dragging = true;
 
@@ -267,8 +272,6 @@ export class CustomModel extends EventEmitter {
                     target.alpha = 1;
                     this.container.filters = [new PIXI.filters.AlphaFilter(1)];
                     target.dragging = false;
-                    // set the interaction data to null
-                    target.data = null;
 
                     offsetX = null;
                     offsetY = null;
@@ -277,11 +280,11 @@ export class CustomModel extends EventEmitter {
 
             const onDragMove = (event: PIXI.InteractionEvent): void => {
                 const target: DragObject = event.currentTarget as DragObject;
-                if (target.dragging === true && target.data !== null && offsetX !== null && offsetY !== null) {
+                if (target.dragging === true && target.dragging !== void 0 && offsetX !== null && offsetY !== null) {
                     this._dragging = true;
                     target.alpha = 0.5;
                     this.container.filters = [new PIXI.filters.AlphaFilter(0.5)];
-                    const newPosition = target.data.getLocalPosition(target.parent);
+                    const newPosition = event.data.getLocalPosition(target.parent);
                     target.x = newPosition.x - offsetX;
                     target.y = newPosition.y - offsetY;
                 }
@@ -443,24 +446,34 @@ export class CustomModel extends EventEmitter {
         const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
         this.model?.update(elapsedMs);
 
-        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y) {
-            const scaleX = this.container.scale.x / this.containerScaleX;
-            const scaleY = this.container.scale.y / this.containerScaleY;
+        //拡大縮小回転に対応
+        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y || this.container.angle !== 0) {
+            //コンテナの現在の倍率：変わる前の倍率を求める
+            const currentExRateX = this.container.scale.x / this.containerScaleX;
+            const currentExRateY = this.container.scale.y / this.containerScaleY;
 
-            this.boxWidth = this.boxWidth * scaleX;
-            this.boxHeight = this.boxHeight * scaleY;
+            //フィルター用のrentagleに使っている大きさを更新
+            this.boxWidth = this.boxWidth * currentExRateX;
+            this.boxHeight = this.boxHeight * currentExRateY;
 
+            //※使用していない。　一応モデルの倍率を更新
+            this.modelScaleX = this.modelScaleX * currentExRateX;
+            this.modelScaleY = this.modelScaleY * currentExRateY;
+
+            //containerの回転に対応
+            this.modelBox.angle = -this.container.angle;
+
+            //現在のコンテナの倍率を記憶
             this.containerScaleX = this.container.scale.x;
             this.containerScaleY = this.container.scale.y;
         }
 
+        //アルファフィルターでモデルをカット
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
         //見えなくなるだけで当たり判定は存在している
-
         // const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
         // const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
-
         //-------------------containerで位置調整する場合
         const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
         const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
@@ -468,7 +481,6 @@ export class CustomModel extends EventEmitter {
         filterArea.x -= this.container.pivot.x * this.containerScaleX;
         filterArea.y -= this.container.pivot.y * this.containerScaleY;
         //---------------------------
-
         this.container.filterArea = filterArea;
         this.filterRectagle = filterArea;
 
@@ -503,7 +515,7 @@ export class CustomModel extends EventEmitter {
     };
 
     /**
-     *
+     *横幅取得
      * @returns {number} 横幅
      */
     getWidth = (): number => {
@@ -511,7 +523,7 @@ export class CustomModel extends EventEmitter {
     };
 
     /**
-     *
+     *縦幅取得
      * @returns {number} 縦幅
      */
     getHeight = (): number => {
@@ -564,49 +576,91 @@ export class CustomModel extends EventEmitter {
         this.model.interactive = bool;
     }
 
+    /**
+     * モデルのアイドル時のモーショングループを設定
+     */
     set idleGroup(groupName: string) {
         if (this.model === null) return;
         this.model.internalModel.motionManager.groups.idle = groupName;
     }
 
+    /**
+     * モデルの音声再生に使うAudioContextを設定
+     * これを設定しないと発声できない
+     */
     set audioContext(audioContext: AudioContext) {
         this._audioContext = audioContext;
     }
 
+    /**
+     * モデルのボタンモードのオンオフ設定
+     */
     set buttonMode(bool: boolean) {
         if (this.model === null) return;
         this.model.buttonMode = bool;
     }
 
+    /**
+     * モデルをドラッグできるか設定
+     */
     set draggable(bool: boolean) {
         this._draggable = bool;
     }
 
+    /**
+     * 現在のドラッグ設定を返す
+     */
     get draggable(): boolean {
         return this._draggable;
     }
 
+    /**
+     * 今現在モデルがドラッグされている最中かを返す
+     */
     get dragging(): boolean {
         return this._dragging;
     }
+
+    /**
+     * 今現在モデルが口パクしているかを返す
+     */
     get isSpeaking(): boolean {
         return this.speaking;
     }
+
+    /**
+     * 今現在モデルが発声しているかを返す
+     */
     get isVoicing(): boolean {
         return this.voicing;
     }
+    /**
+     * 今現在マウスが箱の上に乗っているかを返す
+     */
     get isBoxOn(): boolean {
         return this._isBoxOn;
     }
+
+    /**
+     * 今現在マウスがモデルのヒットテスト領域に乗っているかを表す
+     */
     get isHit(): boolean {
         return this._isHit;
     }
+
+    /**
+     * 今現在のモデルのモーション状態を返す
+     */
     get motionState(): PIXILive2D.MotionState | void {
         if (this.model === null) {
             throw new Error("モデルがないです");
         }
         return this.model?.internalModel.motionManager.state;
     }
+
+    /**
+     * モデルの設定（model3.json）を返す;
+     */
     get settings(): CustomModelSettings | void {
         if (this.model === null) return;
         const settings: CustomModelSettings = this.model.internalModel.settings;
@@ -637,12 +691,12 @@ export class CustomModel extends EventEmitter {
     onMotionStarted = (listner: (currentGroup: string, currentIndex: number, currentMotionState: PIXILive2D.MotionState) => void): void => {
         this.addListener("MotionStarted", listner);
     };
-    onExpressionChanged = (listner: (id: number | string) => void) => {
-        this.addListener("ExpressionChanged", listner);
+    onExpressionSetted = (listner: (id: number | string) => void) => {
+        this.addListener("ExpressionSetted", listner);
     };
 
     /**
-     * 表情再生
+     * 表情を設定
      * @param {number | string } id? 表情の番号または名前、指定しない場合ランダム
      */
     setExpression = (id: number | string): void => {
@@ -670,17 +724,16 @@ export class CustomModel extends EventEmitter {
         //表情反映
         this.model.expression(id);
         this.currentExpression = id;
-        this.emit("ExpressionChanged", id);
+        this.emit("ExpressionSetted", id);
     };
 
     /**
-     * モーション再生
+     * モーションを強制的に再生
      * このクラスでも必ずこれを使う
      * @param {string} group　再生するモーショングループ
      * @param {number} index? 再生するモーションの番号 指定しない場合ランダム
-     * @param {MotionPriority} priority? 再生するモーションの優先度 指定しない　場合MotionPriority.NORMAL
      */
-    forceMotion = (group: string, index?: number): void => {
+    forceMotion = (group: string, index?: number | undefined): void => {
         if (this.model === null) {
             throw new Error("モデルがないです");
         }
@@ -689,10 +742,11 @@ export class CustomModel extends EventEmitter {
         const settings: CustomModelSettings = this.model.internalModel.settings;
         const motionGroups: string[] = Object.keys(settings.motions as {}[]);
         const moitonIndexes: Object[] = settings.motions !== void 0 ? settings.motions[group as any] : null;
-        //ないならキャンセル
+        //モーショングループがないならキャンセル
         if (motionGroups.includes(group) === false) {
             throw new Error(`「${group}」というMorionGroupは存在しない`);
         }
+        //モーションがundefiedではなく数値の時insexが違反ならキャンセル
         if (index !== void 0) {
             if (moitonIndexes.length - 1 < index || index < 0) {
                 throw new Error(`${group}に「${index}」番目のモーションはありません。`);
@@ -704,7 +758,7 @@ export class CustomModel extends EventEmitter {
         //motion()のまえでノーマルの表情に初期化、setTImerで現在の表情をあてはめることで修正できる
         this.model.expression(this.normalExpressionIndex); //表情リセット
 
-        this.model.internalModel.motionManager.stopAllMotions(); //----------------------------------------------これでモーションを止める必要がある
+        this.stopMotions(); //----------------------------------------------これでモーションを止める必要がある
         this.model.motion(group, index, PIXILive2D.MotionPriority.FORCE); //モーション再生
         const currentState = this.model.internalModel.motionManager.state;
 
@@ -719,8 +773,27 @@ export class CustomModel extends EventEmitter {
         }, 10);
     };
 
+    /**
+     * モーションを強制的に止める
+     */
+    stopMotions = (): void => {
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
+
+        this.model.internalModel.motionManager.stopAllMotions();
+    };
+
+    /**
+     *
+     * @param {number} x グローバルなマウスの位置x
+     * @param {number} y グローバルなマウスの位置y
+     */
     setFocus = (x: number, y: number): void => {
-        this.model?.focus(x, y);
+        if (this.model === null) {
+            throw new Error("モデルがないです");
+        }
+        this.model.focus(x, y);
     };
 
     /**
@@ -747,7 +820,12 @@ export class CustomModel extends EventEmitter {
         this.emit("StartSpeak"); //---------------------------------------------
     };
 
-    //audioBufferを受け取って音声を再生し、リアルタイムに「audioBuffer」の音量に応じて口パクする
+    /**
+     * AudioBufferを受け取って音声を再生し、リアルタイムにAudioBufferの「波形」に応じて口パクする
+     * @param {AudioBuffer} audioBuffer 再生したい音
+     * @param {number} frequency 一秒あたり何度解析するか=一秒間に何回口の大きさを変更するか
+     */
+
     startVoice = (audioBuffer: AudioBuffer, frequency?: number) => {
         if (this.model === null) {
             throw new Error("モデルがない");
@@ -755,6 +833,7 @@ export class CustomModel extends EventEmitter {
         if (this._audioContext === null) {
             throw new Error("AudioContextがない");
         }
+
         //前の音を止める
         if (this.voicing === true || this.speaking === true) {
             this.stopSpeak();
@@ -826,14 +905,14 @@ export class CustomModel extends EventEmitter {
     };
 
     /**
-     * 話すのをやめる
+     * 口パク・発声をやめる
      */
     stopSpeak = (): void => {
         if (this.model === null) {
             throw new Error("モデルがないです");
         }
         if (this.speaking === false && this.voicing === false) {
-            throw new Error("話していないので何もしない");
+            console.log("口パク・発声していないので何もしない");
         }
         //
         //前の音を止める

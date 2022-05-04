@@ -30,7 +30,6 @@ export default class IndexLibrary {
 }
 
 //http://localhost:40080
-//http://60.130.130.16
 //http://192.168.3.10:40080
 
 //550, 900, 0.235, 0, -20 モデル全身/

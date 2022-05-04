@@ -28,8 +28,9 @@
                 <button type="button" id="startMotion" class="col">モーション再生</button>
             </div>
             <div class="row m-2">
-                <button type="button" id="normalEx" class="col">表情：ノーマル</button>
-                <button type="button" id="negativeEx" class="col">表情：マイナス</button>
+                <select class ="col" id="selectExpression">
+                </select>
+                <button type="button" id="setExpression" class="col">表情をセット</button>
             </div>
             <div class="row m-2">
                 <button type="button" id="speakStart" class="col">口パク</button>
@@ -49,9 +50,8 @@
         </div>
         <script>
                         //http://localhost:40080
-            //http://60.130.130.16
             //http://192.168.3.10:40080
-            const serverURL = "http://192.168.3.10:40080";
+            const serverURL = "http://localhost:50021";
             const debug = false;
             const modelPath = "/Resources/Hiyori_2/Hiyori.model3.json";
 

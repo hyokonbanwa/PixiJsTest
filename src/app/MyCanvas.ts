@@ -1,6 +1,7 @@
 import * as PIXI from "pixi.js";
 //import * as PIXILive2D from "pixi-live2d-display";
 import { CustomModel } from "./CustomModel";
+import { Range } from "./Elements";
 import { Client, Query } from "voicevox-api-client";
 import { ModelPosition } from "./types";
 //import { threadId } from "worker_threads";
@@ -53,6 +54,8 @@ export class MyCanvas {
             transparent: debug === true ? false : true, //http://runstant.com/pentamania/projects/82dc0e31
         };
         this.app = new PIXI.Application(pixiOptions);
+        //const uxStage = new PIXI.Stage
+
         this.audioContext = new AudioContext();
 
         //550, 900, 0.235, 0, -20 モデル全身/
@@ -62,29 +65,42 @@ export class MyCanvas {
         this.hiyori = new CustomModel(modelPath, "normal1", modelPosition.boxWidth, modelPosition.boxHeight, modelPosition.modelScale, modelPosition.modelX, 500);
         if (serverConnect === true && serverURL !== void 0) {
             //http://localhost:40080
-            //http://60.130.130.16
             //http://192.168.3.10:40080
             this.voicevoxClient = new Client(serverURL);
             this.hiyori.audioContext = this.audioContext;
+            this.testConnect();
         } else {
             this.voicevoxClient = null;
         }
     }
 
+    //サーバー接続をテストする
+    testConnect = async () => {
+        if (this.voicevoxClient === null) return;
+        const query: Query = await this.voicevoxClient.query.createQuery(0, "テストテスト");
+        const voiceArrayBuffer: ArrayBuffer = await this.voicevoxClient.voice.createVoice(0, query);
+        // Web Audio APIで使える形式に変換
+        const voiceAudioBufer: AudioBuffer = await this.audioContext.decodeAudioData(voiceArrayBuffer); //「ArrayBuffer」を「AudioBuffer」に変換
+        console.log("サーバ応答テスト完了");
+    };
+
     //ロード処理と初期配置を書く
     initialize = async () => {
+        //--------------------------モデルの設定
         await this.hiyori.makeModel();
         const hiyoriModel = this.hiyori.getContainer();
         hiyoriModel.pivot.set(this.hiyori.getWidth() / 2, this.hiyori.getHeight() / 2);
         hiyoriModel.x = 500;
         hiyoriModel.y = 500;
+        //hiyoriModel.angle = 45;
         //hiyoriModel.scale.set(1.25, 1.25);
         const stage = this.app.stage;
         // const dai = new PIXI.Graphics();
         // dai.beginFill(0xcc0000).drawRect(0, 0, 500, 500).endFill();
         // dai.x = 100;
         // dai.y = 100;
-        //dai.addChild(hiyoriModel);
+        // dai.addChild(hiyoriModel);
+        // stage.addChild(dai);
         stage.addChild(hiyoriModel);
         if (this.debug === true) {
             this.hiyori.displayBox();
@@ -160,7 +176,7 @@ export class MyCanvas {
             console.log(`「${currentGroup}」グループの、「${currentIndex}」番目のモーションが開始`);
         });
 
-        this.hiyori.onExpressionChanged((id: string | number) => {
+        this.hiyori.onExpressionSetted((id: string | number) => {
             if (typeof id === "string") {
                 console.log(`「${id}」という表情に切り替え。`);
             }
@@ -168,10 +184,52 @@ export class MyCanvas {
                 console.log(`「${id}番目」の表情に切り替え。`);
             }
         });
+        //---------------------------
+
+        //---------------回転スライダーの設定
+        const range = new Range(600, 30, 36);
+        stage.addChild(range.range);
+        range.range.x = 500;
+        range.range.y = 950;
+        range.addEventListener("change", () => {
+            //console.log(range.step);
+            hiyoriModel.angle = range.step * 10;
+        });
+        // // 角丸四角形を描く
+        // const roundBox = new PIXI.Graphics();
+        // roundBox.lineStyle(4, 0x555555, 1);
+        // roundBox.beginFill(0x777777);
+        // // drawRoundedRect(x, y, width, height, cornerRadius)
+        // roundBox.drawRoundedRect(0, 0, 500, 50, 20);
+        // roundBox.endFill();
+        // // // 位置（四角の左上が基準として）
+        // roundBox.x = 400;
+        // roundBox.y = 0;
+        // stage.addChild(roundBox);
+
+        // // 円形を描く
+        // const circle = new PIXI.Graphics();
+        // circle.beginFill(0x00bfff);
+        // // drawCircle(x, y, radius半径)
+        // circle.drawCircle(0, 0, 30);
+        // circle.endFill();
+        // // 位置（円の中心が基準として）
+        // circle.x = 400;
+        // circle.y = 0;
+        // stage.addChild(circle);
+
+        // //2*circle - roundbox
+
+        // console.log("bunny1:", roundBox.x, roundBox.y);
+        // console.log("bunny2:", circle.x, circle.y);
+        // console.log(roundBox.toLocal(circle.position).x, roundBox.toLocal(circle.position).y);
 
         //時間経過で必要になる処理を加えていく
         const addUpdate = () => {
             this.app.ticker.add(this.hiyori.update);
+            // this.app.ticker.add((deltaFrame: number) => {
+            //     hiyoriModel.angle += (360 / 600) * deltaFrame;
+            // });
             // if (this.hiyori.model != null) {
             //     //this.app.ticker.add(() => this.hiyori?.model?.update(this.app.ticker.elapsedMS));
             //     // this.app.ticker.add((delta) => {
@@ -233,6 +291,7 @@ export class MyCanvas {
         this.hiyori.startVoice(voiceAudioBufer, 15);
     };
 
+    //webspeechで話す
     playWebSpeech = (voice: SpeechSynthesisVoice, text: string, volume?: number) => {
         window.speechSynthesis.cancel(); //------------------これでwebspeechを止める
 
