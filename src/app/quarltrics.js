@@ -2,7 +2,7 @@
     let indexLibrary = null;
     const serverURL = "localhost://41080";
     const debug = false;
-    const modelPath = "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@main/Resources/Hiyori_2/hiyori.model3.json";
+    const modelPath = "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@928a190853149ecf300f583bfba8ac825062bf7c/Resources/Hiyori_2/hiyori.model3.json";
 
     Qualtrics.SurveyEngine.addOnload(function () {
         // const cssLink = document.createElement("link");
@@ -32,7 +32,7 @@
         const requiredResources = [
             "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
             "https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js",
-            "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@main/js/IndexLibrary.js",
+            "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@928a190853149ecf300f583bfba8ac825062bf7c/js/IndexLibrary.js",
         ];
 
         const loadScript = (idx) => {
