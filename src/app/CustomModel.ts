@@ -475,15 +475,20 @@ export class CustomModel extends EventEmitter {
         //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
         //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
         //見えなくなるだけで当たり判定は存在している
-        // const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
-        // const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
-        //-------------------containerで位置調整する場合
-        const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-        const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+        //------------------modelBoxで位置調整する場合
+        const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
+        const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
         //filterAreaの位置調整
-        filterArea.x -= this.container.pivot.x * this.containerScaleX;
-        filterArea.y -= this.container.pivot.y * this.containerScaleY;
-        //---------------------------
+        filterArea.x -= this.boxWidth / 2;
+        filterArea.y -= this.boxHeight / 2;
+        //------------------
+        // //-------------------containerで位置調整する場合
+        // const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+        // const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+        // //filterAreaの位置調整
+        // filterArea.x -= this.container.pivot.x * this.containerScaleX;
+        // filterArea.y -= this.container.pivot.y * this.containerScaleY;
+        // //---------------------------
         this.container.filterArea = filterArea;
         this.filterRectagle = filterArea;
 

@@ -57,10 +57,13 @@ export class Range {
             const xPoint = mousePoint.x;
             if (xPoint >= 0 && xPoint <= this.rangeLength) {
                 //this.handle.x = xPoint;
-                this.handle.x = (Math.round(xPoint / this.rangeLength / (1 / max)) / max) * this.rangeLength;
+                this.handle.x = (Math.round((xPoint / this.rangeLength) * max) / max) * this.rangeLength;
+            } else if (xPoint < 0) {
+                this.handle.x = 0;
+            } else if (xPoint > this.rangeLength) {
+                this.handle.x = this.rangeLength;
             }
-            const tick = 100 / max;
-            this.handlePoint = (Math.round(((this.handle.x / this.rangeLength) * 100) / tick) / max) * 100;
+            this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             //this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             this.step = Math.round(this.max * (this.handlePoint / 100));
             this.upBar.clear();
@@ -88,10 +91,13 @@ export class Range {
             const xPoint = mousePoint.x;
             if (xPoint >= 0 && xPoint <= this.rangeLength) {
                 //this.handle.x = xPoint;
-                this.handle.x = (Math.round(xPoint / this.rangeLength / (1 / max)) / max) * this.rangeLength;
+                this.handle.x = (Math.round((xPoint / this.rangeLength) * max) / max) * this.rangeLength;
+            } else if (xPoint < 0) {
+                this.handle.x = 0;
+            } else if (xPoint > this.rangeLength) {
+                this.handle.x = this.rangeLength;
             }
-            const tick = 100 / max;
-            this.handlePoint = (Math.round(((this.handle.x / this.rangeLength) * 100) / tick) / max) * 100;
+            this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             //this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             this.step = Math.round(this.max * (this.handlePoint / 100));
             this.upBar.clear();
@@ -127,10 +133,13 @@ export class Range {
             const xPoint = mousePoint.x - (this.dragPointX as number);
             if (xPoint >= 0 && xPoint <= this.rangeLength) {
                 //this.handle.x = xPoint;
-                this.handle.x = (Math.round(xPoint / this.rangeLength / (1 / max)) / max) * this.rangeLength;
+                this.handle.x = (Math.round((xPoint / this.rangeLength) * max) / max) * this.rangeLength;
+            } else if (xPoint < 0) {
+                this.handle.x = 0;
+            } else if (xPoint > this.rangeLength) {
+                this.handle.x = this.rangeLength;
             }
-            const tick = 100 / max;
-            this.handlePoint = (Math.round(((this.handle.x / this.rangeLength) * 100) / tick) / max) * 100;
+            this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             //this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             this.step = Math.round(this.max * (this.handlePoint / 100));
             this.upBar.clear();
@@ -150,10 +159,13 @@ export class Range {
             const xPoint = mousePoint.x - (this.dragPointX as number);
             if (xPoint >= 0 && xPoint <= this.rangeLength) {
                 //this.handle.x = xPoint;
-                this.handle.x = (Math.round(xPoint / this.rangeLength / (1 / max)) / max) * this.rangeLength;
+                this.handle.x = (Math.round((xPoint / this.rangeLength) * max) / max) * this.rangeLength;
+            } else if (xPoint < 0) {
+                this.handle.x = 0;
+            } else if (xPoint > this.rangeLength) {
+                this.handle.x = this.rangeLength;
             }
-            const tick = 100 / max;
-            this.handlePoint = (Math.round(((this.handle.x / this.rangeLength) * 100) / tick) / max) * 100;
+            this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             //this.handlePoint = (this.handle.x / this.rangeLength) * 100;
             this.step = Math.round(this.max * (this.handlePoint / 100));
             this.upBar.clear();

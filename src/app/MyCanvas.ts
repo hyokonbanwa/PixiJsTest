@@ -187,15 +187,17 @@ export class MyCanvas {
         //---------------------------
 
         //---------------回転スライダーの設定
-        const range = new Range(600, 30, 36);
+        const range = new Range(600, 30, 360, 0);
         stage.addChild(range.range);
         range.range.x = 500;
         range.range.y = 965;
+        //range.range.angle = 45;
         range.addEventListener("change", () => {
             //console.log(range.step);
-            hiyoriModel.angle = range.step * 10;
+            hiyoriModel.angle = range.step;
             //console.log(hiyoriModel.angle)
         });
+
         // // 角丸四角形を描く
         // const roundBox = new PIXI.Graphics();
         // roundBox.lineStyle(4, 0x555555, 1);
