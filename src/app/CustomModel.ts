@@ -341,38 +341,40 @@ export class CustomModel extends EventEmitter {
             // }
         };
         setListener();
-        const customMotionUpdate = () => {
-            if (this.model != null) {
-                const internalModel: PIXILive2D.Cubism4InternalModel = this.model.internalModel as PIXILive2D.Cubism4InternalModel;
-                const motionManager: PIXILive2D.Cubism4MotionManager = this.model.internalModel.motionManager as PIXILive2D.Cubism4MotionManager;
-                motionManager.update = (model: object, now: DOMHighResTimeStamp): boolean => {
-                    if (motionManager.isFinished()) {
-                        if (motionManager.playing) {
-                            motionManager.playing = false;
-                            this.emit("motionFinish");
-                        }
 
-                        if (motionManager.state.shouldOverrideExpression()) {
-                            motionManager.expressionManager?.restoreExpression();
-                        }
+        // const customMotionUpdate = () => {
+        //     if (this.model != null) {
+        //         const internalModel: PIXILive2D.Cubism4InternalModel = this.model.internalModel as PIXILive2D.Cubism4InternalModel;
+        //         const motionManager: PIXILive2D.Cubism4MotionManager = this.model.internalModel.motionManager as PIXILive2D.Cubism4MotionManager;
+        //         motionManager.update = (model: object, now: DOMHighResTimeStamp): boolean => {
+        //             if (motionManager.isFinished()) {
+        //                 if (motionManager.playing) {
+        //                     motionManager.playing = false;
+        //                     motionManager.emit("motionFinish");
 
-                        motionManager.state.complete();
+        //                 }
 
-                        if (motionManager.state.shouldRequestIdleMotion()) {
-                            // noinspection JSIgnoredPromiseFromCall
-                            motionManager.startRandomMotion(motionManager.groups.idle, PIXILive2D.MotionPriority.IDLE);
-                        }
-                    }
+        //                 if (motionManager.state.shouldOverrideExpression()) {
+        //                     motionManager.expressionManager?.restoreExpression();
+        //                 }
 
-                    let updated = motionManager.queueManager.doUpdateMotion(internalModel.coreModel, now);
+        //                 motionManager.state.complete();
 
-                    updated = motionManager.expressionManager?.update(model, now) || updated;
+        //                 if (motionManager.state.shouldRequestIdleMotion()) {
+        //                     // noinspection JSIgnoredPromiseFromCall
+        //                     motionManager.startRandomMotion(motionManager.groups.idle, PIXILive2D.MotionPriority.IDLE);
+        //                 }
+        //             }
 
-                    return updated;
-                };
-            }
-        };
-        customMotionUpdate();
+        //             let updated = motionManager.queueManager.doUpdateMotion(internalModel.coreModel, now);
+
+        //             updated = motionManager.expressionManager?.update(model, now) || updated;
+
+        //             return updated;
+        //         };
+        //     }
+        // };
+        // customMotionUpdate();
 
         const customModelUpdate = () => {
             if (this.model !== null) {
