@@ -1,3 +1,5 @@
+//このクラスがおおもとのライブラリで、これをqualtricsまたはindex.htmlで呼び出して使っている。
+
 import "../css/index.scss";
 import * as bootstrap from "bootstrap";
 import { App } from "./App";
@@ -20,6 +22,7 @@ export default class IndexLibrary {
     onload = () => {
         console.log("DOMLoadedAction");
         this.app = new App(this.debug, this.serverURL, this.modelPath, this.modelPosition); //
+        console.log("ロードした");
         this.app.mount();
     };
     onUnload = () => {

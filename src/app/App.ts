@@ -213,7 +213,7 @@ export class App {
                 //文字が入力されているなら
                 if (textBox.value === "") {
                     console.log("文字が入力されていない");
-                    this.pixiCanvas.playVoice(speaker, "私に話させたい文字列を入力してください。");
+                    this.pixiCanvas.playVoice(speaker, "私に話させたい文字列を入力してください。", 1.75);
                 } else {
                     this.pixiCanvas.playVoice(speaker, textBox.value, 1.75);
                 }

@@ -1,3 +1,6 @@
+//20220503 使用するのをやめた。
+//VOICEVOXのクラス。
+
 import { Client, Query } from "voicevox-api-client";
 export class VOICEVOXAudio {
     private audioSource: AudioBufferSourceNode | null;

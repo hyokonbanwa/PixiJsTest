@@ -40,10 +40,11 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 // [定数] webpack の出力オプションを指定します
 // 'production' か 'development' を指定
-//
-const MODE = "development";
+//https://zenn.dev/sprout2000/articles/9d026d3d9e0e8f#node_env-%E3%81%A7%E5%87%A6%E7%90%86%E3%82%92%E5%88%86%E5%B2%90%E3%81%99%E3%82%8B
+const MODE = process.env.NODE_ENV;
+
 // CSSソースマップの利用有無(productionのときはソースマップを利用しない)
-const enabledSourceMap = MODE === "development";
+const enabledSourceMap = MODE === "development" ? true : false;
 let enableDevTool;
 let publicPath;
 if (MODE === "development") {
