@@ -1,8 +1,21 @@
 {
     let indexLibrary = null;
-    const serverURL = "localhost://41080";
+    //VOICEVOXのサーバーアドレス 　サーバーはngrok等でhttps化しないとだめ
+    const serverURL = "https://a48e-2400-2651-41c2-1500-4405-5e59-5c98-3b57.jp.ngrok.io";
     const debug = false;
-    const modelPath = "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@928a190853149ecf300f583bfba8ac825062bf7c/Resources/Hiyori_2/hiyori.model3.json";
+    const modelPath = "https://cdn.jsdelivr.net/gh/GifuTaro/AgentInteractionResources@bbefa1fcbe1df13228b719d5a4e447d554199f38/Resources/Hiyori_2/hiyori.model3.json";
+
+    //モデルの大きさと①
+    //900, 900, 0.235, 0, -20 モデル全身/
+    //550, 700, 0.45, 0, 500 モデル顔中心
+    //225, 350, 0.25, 0, 250
+    const position = {
+        boxWidth: 500,
+        boxHeight: 700,
+        modelScale: 0.45,
+        modelX: 0,
+        modelY: 500,
+    };
 
     Qualtrics.SurveyEngine.addOnload(function () {
         // const cssLink = document.createElement("link");
@@ -27,12 +40,10 @@
         //jfe.classList.add("bg-danger");
         //次ボタンを隠す
         this.hideNextButton();
-        //https://cdn.jsdelivr.net/gh/GifuTaro/InteractiveValueResources@main/css/SectionOmote.css
-        //https://cdn.jsdelivr.net/gh/hyokonbanwa/InteractiveValueResources@314b41d7013a67b7460c1aba0509061ce9d85607/
         const requiredResources = [
             "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
             "https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js",
-            "https://cdn.jsdelivr.net/gh/hyokonbanwa/QualtricsAppResources2@928a190853149ecf300f583bfba8ac825062bf7c/js/IndexLibrary.js",
+            "https://cdn.jsdelivr.net/gh/GifuTaro/AgentInteractionResources@bbefa1fcbe1df13228b719d5a4e447d554199f38/js/IndexLibrary.js",
         ];
 
         const loadScript = (idx) => {
@@ -47,16 +58,6 @@
         };
 
         const initExp = () => {
-            //550, 900, 0.235, 0, -20 モデル全身/
-            //550, 700, 0.45, 0, 500 モデル顔中心
-            //225, 350, 0.25, 0, 250
-            const position = {
-                boxWidth: 550,
-                boxHeight: 700,
-                modelScale: 0.45,
-                modelX: 0,
-                modelY: 500,
-            };
             //インスタンス作成＆DOMLoad操作
             console.log("ロード");
             indexLibrary = new IndexLibrary(debug, serverURL, modelPath, position);
