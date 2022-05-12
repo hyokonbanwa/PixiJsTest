@@ -32,7 +32,7 @@ type IApplicationOptions = {
 };
 
 export class MyCanvas {
-    private app: PIXI.Application; //アプリ
+    private pixiApp: PIXI.Application; //アプリ
     public hiyori: CustomModel; //Live2Dモデル
     private audioContext: AudioContext; //音声再生機
     private voicevoxClient: Client | null; //VOICEVOXサーバークライアント
@@ -57,7 +57,7 @@ export class MyCanvas {
             //autoDensity: true,
             transparent: debug === true ? false : true, //http://runstant.com/pentamania/projects/82dc0e31
         };
-        this.app = new PIXI.Application(pixiOptions);
+        this.pixiApp = new PIXI.Application(pixiOptions);
         //const uxStage = new PIXI.Stage
 
         this.audioContext = new AudioContext();
@@ -91,7 +91,7 @@ export class MyCanvas {
 
     //ロード処理と初期配置を書く
     initialize = async () => {
-        const stage = this.app.stage; //PIXIJSのステージを取得
+        const stage = this.pixiApp.stage; //PIXIJSのステージを取得
 
         //-----------------------------------------------------モデルの設定
         await this.hiyori.makeModel(); //非同期で作成するので待機
@@ -240,24 +240,24 @@ export class MyCanvas {
 
         //時間経過で必要になる処理を加えていく
         const addUpdate = () => {
-            this.app.ticker.add(this.hiyori.update); //tickerにLive2Dモデルのアップデートを加える。
-            // this.app.ticker.add((deltaFrame: number) => {
+            this.pixiApp.ticker.add(this.hiyori.update); //tickerにLive2Dモデルのアップデートを加える。
+            // this.pixiApp.ticker.add((deltaFrame: number) => {
             //     hiyoriModel.angle += (360 / 600) * deltaFrame;
             // });
             // if (this.hiyori.model != null) {
-            //     //this.app.ticker.add(() => this.hiyori?.model?.update(this.app.ticker.elapsedMS));
-            //     // this.app.ticker.add((delta) => {
+            //     //this.pixiApp.ticker.add(() => this.hiyori?.model?.update(this.pixiApp.ticker.elapsedMS));
+            //     // this.pixiApp.ticker.add((delta) => {
             //     //     //console.log(params);
             //     //     //deltaとelapsedmsの違い　https://www.html5gamedevs.com/topic/36268-pixiticker-deltatime-vs-elapsedms/
             //     //     console.log("デルタ:" + delta); //1秒間に60FPSを基準として前回のフレームから何フレーム分更新したか、60fpsでのフレーム単位の処理を書く 1Frame /(144FPS / 60FPS) = 0.42Frame
-            //     //     console.log(this.app.ticker.elapsedMS); //前回のフレームから何ms更新したか 1000ms/ 144 = 7ms、ミリ秒単位の処理を書く
+            //     //     console.log(this.pixiApp.ticker.elapsedMS); //前回のフレームから何ms更新したか 1000ms/ 144 = 7ms、ミリ秒単位の処理を書く
             //     // });
             // }
         };
         addUpdate();
         //const widget = new PIXI.
         // const food: PIXI.Sprite = PIXI.Sprite.from("/Resources/foodImgs/0002_カレー.jpg");
-        // this.app.stage.addChild(food);
+        // this.pixiApp.stage.addChild(food);
         // food.position.set(450, 450);
         // const modelOptions: PIXILive2D.Live2DFactoryOptions = {
         //     autoUpdate: false,
@@ -273,7 +273,7 @@ export class MyCanvas {
         // } else {
         //     model.scale.set(width / model.width, width / model.width);
         // }
-        // this.app.stage.addChild(model);
+        // this.pixiApp.stage.addChild(model);
         // transforms
         // model.x = 500;
         // model.y = 500;
@@ -283,9 +283,9 @@ export class MyCanvas {
         // model.anchor.set(0.5, 0.5);
         //動く
         //これを大本でtickeradd(this.hiyori.update)のようにする
-        // this.app.ticker.add(() => {
-        //     model.update(this.app?.ticker.elapsedMS as number);
-        //     //console.log(this.app?.ticker.elapsedMS);
+        // this.pixiApp.ticker.add(() => {
+        //     model.update(this.pixiApp?.ticker.elapsedMS as number);
+        //     //console.log(this.pixiApp?.ticker.elapsedMS);
         // });
         // const ticker = new PIXI.Ticker();
         // ticker.add(() => model.update(ticker.elapsedMS));
@@ -302,7 +302,7 @@ export class MyCanvas {
         const voiceArrayBuffer: ArrayBuffer = await this.voicevoxClient.voice.createVoice(speaker, query);
         // Web Audio APIで使える形式に変換
         const voiceAudioBufer: AudioBuffer = await this.audioContext.decodeAudioData(voiceArrayBuffer); //「ArrayBuffer」を「AudioBuffer」に変換
-        this.hiyori.startVoice(voiceAudioBufer, 15);
+        this.hiyori.startVoice(this.pixiApp, voiceAudioBufer, 15);
     };
 
     //webspeechで話す
@@ -326,7 +326,7 @@ export class MyCanvas {
     };
 
     destoroy = (): void => {
-        this.app.destroy();
+        this.pixiApp.destroy();
     };
 }
 

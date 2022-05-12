@@ -3,10 +3,12 @@ import * as PIXILive2D from "pixi-live2d-display";
 import { EventEmitter } from "eventemitter3";
 import { HitAreaFrames } from "./HitAreaFrames";
 
+//ドラッグに対応するための型を作成
 interface DragObject extends PIXI.DisplayObject {
     dragging: boolean;
 }
 
+//設定ファイルの定義を拡張
 interface CustomModelSettings extends PIXILive2D.ModelSettings {
     expressions?: any[];
     groups?: any[];
@@ -14,6 +16,15 @@ interface CustomModelSettings extends PIXILive2D.ModelSettings {
     layout?: any;
     motions?: any[];
 }
+
+//現在のエージェントの話状態を表す
+const SpeakState = {
+    Noting: "Noting",
+    Speaking: "Speaking",
+    Voicing: "Voicing",
+} as const;
+type SpeakState = typeof SpeakState[keyof typeof SpeakState];
+
 /**
  * ToDo
  * 回転に対応
@@ -68,9 +79,8 @@ export class CustomModel extends EventEmitter {
     private _isHit: boolean; //モデルとマウスの当たり判定が生じているかどうか＝hitイベントの時の発火基準
 
     //発声関係
-    private speaking: boolean; //モデルが口パクしているかどうか
+    private speakState: SpeakState;
     private speakSpeed: number; //モデルの口パクスピード | 2π x speakSpeed x t | で用いる
-    private voicing: boolean; //モデルが発声しているかどうか
     private voiceVolume: number; //モデルの音量
 
     //表情関係
@@ -85,7 +95,6 @@ export class CustomModel extends EventEmitter {
     // private reservedIndex: string;
 
     //音声再生関係;
-    private intervalVoiceID: number | null; //音声解析する際のインターナルタイマー
     private _audioContext: AudioContext | null; //AudioContext
     private voiceSource: AudioBufferSourceNode | null; //受け取ったaudioBufferをセットするAudioBufferSourceNode
 
@@ -95,8 +104,8 @@ export class CustomModel extends EventEmitter {
      * @param {number}boxWidth モデルを入れる箱の横幅
      * @param {number}boxHeight 縦幅
      * @param {number}modelScale 箱の中のモデルの拡大率
-     * @param {}modelX 箱の中のモデルが中心から
-     * @param {}modelY
+     * @param {number}modelX 箱の中のモデルが中心から
+     * @param {number}modelY
      */
     constructor(modelPath: string, normalExpressionIndex: number | string, boxWidth: number, boxHeight: number, modelScale?: number, modelX?: number, modelY?: number) {
         super();
@@ -135,9 +144,8 @@ export class CustomModel extends EventEmitter {
         this._isBoxOn = false;
         this._isHit = false;
 
-        this.speaking = false;
+        this.speakState = SpeakState.Noting;
         this.speakSpeed = -1;
-        this.voicing = false;
         this.voiceVolume = -1;
 
         this.currentExpression = null;
@@ -151,7 +159,6 @@ export class CustomModel extends EventEmitter {
 
         this._audioContext = null;
         this.voiceSource = null;
-        this.intervalVoiceID = null;
     }
 
     /**
@@ -438,16 +445,15 @@ export class CustomModel extends EventEmitter {
                     //Live2Dmodel.motion()、live2Dmodel.expression()によらないパラメーター操作はここで行う
                     // TODO: Add lip sync API
                     //周期的な口パク
-                    if (internalModel.lipSync === true && this.speaking === true) {
+                    if (internalModel.lipSync === true && this.speakState === SpeakState.Speaking) {
                         //console.log("口パク中");
                         const value = Math.abs(Math.sin(2 * Math.PI * this.speakSpeed * now)); // 0 ~ 1
 
                         internalModel.coreModel.addParameterValueById("ParamMouthOpenY", value, 0.8);
                         //console.log("口："+coreModel.getParameterValueById("ParamMouthOpenY"));
                     }
-
                     //ボリュームに基づく音声
-                    if (internalModel.lipSync === true && this.voicing === true) {
+                    else if (internalModel.lipSync === true && this.speakState === SpeakState.Voicing) {
                         //console.log("発話中");
                         internalModel.coreModel.addParameterValueById("ParamMouthOpenY", this.voiceVolume, 0.8);
                     }
@@ -479,8 +485,8 @@ export class CustomModel extends EventEmitter {
 
         //モデルのアップデート
         const frameRate = 60 / deltaFrame; //フレームレートを求める
-        const elapsedMs = 1000 / frameRate; //前回からの経過時間を求める
-        this.model?.update(elapsedMs);
+        const deltaMs = 1000 / frameRate; //前回からの経過時間を求める
+        this.model?.update(deltaMs);
 
         //拡大縮小回転に対応
         if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y || this.containerAngle !== this.container.angle) {
@@ -667,14 +673,15 @@ export class CustomModel extends EventEmitter {
      * 今現在モデルが口パクしているかを返す
      */
     get isSpeaking(): boolean {
-        return this.speaking;
+        return this.speakState === SpeakState.Speaking ? true : false;
     }
 
     /**
      * 今現在モデルが発声しているかを返す
+     *
      */
     get isVoicing(): boolean {
-        return this.voicing;
+        return this.speakState === SpeakState.Voicing ? true : false;
     }
     /**
      * 今現在マウスが箱の上に乗っているかを返す
@@ -851,11 +858,11 @@ export class CustomModel extends EventEmitter {
         }
 
         //前の音をとめる
-        if (this.voicing === true || this.speaking === true) {
+        if (this.speakState === SpeakState.Voicing) {
             this.stopSpeak();
         }
 
-        this.speaking = true;
+        this.speakState = SpeakState.Speaking;
 
         this.speakSpeed = speakSpeed;
 
@@ -864,11 +871,12 @@ export class CustomModel extends EventEmitter {
 
     /**
      * AudioBufferを受け取って音声を再生し、リアルタイムにAudioBufferの「波形」に応じて口パクする
+     * @param {pixiApp} pixiApp モデルを設置しているPIXI.Application
      * @param {AudioBuffer} audioBuffer 再生したい音
      * @param {number} frequency 一秒あたり何度解析するか=一秒間に何回口の大きさを変更するか
      */
 
-    startVoice = (audioBuffer: AudioBuffer, frequency?: number) => {
+    startVoice = (pixiApp: PIXI.Application, audioBuffer: AudioBuffer, frequency?: number) => {
         if (this.model === null) {
             throw new Error("モデルがない");
         }
@@ -877,14 +885,16 @@ export class CustomModel extends EventEmitter {
         }
 
         //前の音を止める
-        if (this.voicing === true || this.speaking === true) {
-            this.stopSpeak();
+        if (this.voiceSource !== null) {
+            this.voiceSource.stop(); //ended関数実行
+            this.voiceSource = null;
         }
-        this.voicing = true;
+        this.speakSpeed = 0;
+        this.speakState = SpeakState.Voicing;
         this.emit("StartSpeak"); //----------------------------------------
 
         const startVoiceTime = this._audioContext.currentTime;
-        frequency = frequency ?? 15;
+
         //AudioCOntextで扱うプレイヤー作成
         this.voiceSource = this._audioContext.createBufferSource();
         // 変換されたバッファーを音源として設定
@@ -899,9 +909,51 @@ export class CustomModel extends EventEmitter {
         //アナライザーを出力につなげる。
         analyser.connect(this._audioContext.destination);
 
-        //再生終了時にstop()するリスナー登録
-        //-------------------------------------------------------ここで登録されたリスナーはAudioSourceNode.stop()時にじっこうさせるので注意
-        this.voiceSource.addEventListener("ended", (e: Event) => {
+        //解析する
+        //ループするリスナー関数の設定関数（クロージャー関数）
+        const tickerListnerSetting = () => {
+            let accumulatedMs = 0; //蓄積時間
+
+            const tickerListner = (deltaFrame: number) => {
+                frequency = frequency ?? 15; //解析する頻度;
+                const frameRate = 60 / deltaFrame; //フレームレートを求める
+                const deltaMs = 1000 / frameRate; //前回からの経過時間を求める
+                accumulatedMs += deltaMs;
+                if (accumulatedMs >= 1000 / frequency) {
+                    //console.log(accumulatedMs + "で実行");
+                    accumulatedMs = 0; //蓄積時間を0にする
+
+                    // 一秒あたりfftSize個に分割した音量を取得する
+                    const timeVolumes = new Uint8Array(analyser.fftSize);
+                    analyser.getByteTimeDomainData(timeVolumes);
+                    const currentVolume = normalizeLastVolume(timeVolumes); //音量を0～1に正規化
+                    this.voiceVolume = currentVolume;
+
+                    function normalizeLastVolume(volumes: Uint8Array) {
+                        // console.log((times[times.length - 1] - ave) / he);
+                        //値を正規化
+                        const tmp = (volumes[volumes.length - 1] - Math.min(...volumes)) / (Math.max(...volumes) - Math.min(...volumes));
+                        //127,128が多ければ無音と考える削除する
+                        let cnt = 0;
+                        volumes.forEach((currentValue: number) => {
+                            if (currentValue === 127 || currentValue === 128) {
+                                cnt += 1;
+                            }
+                        });
+                        //条件は127,128のかずが半分以下、Nanじゃない、1と0じゃない
+                        const volume = cnt < (volumes.length - 1) / 2 && isNaN(tmp) !== true && 0 < tmp && tmp < 1 ? tmp : 0;
+                        return volume;
+                    }
+                }
+            };
+
+            return tickerListner;
+        };
+        const settedTickerListner = tickerListnerSetting(); //クロージャーで関数に状態を持たせる
+        pixiApp.ticker.add(settedTickerListner); //tikcerに加える＝毎フレーム処理されるようになる
+
+        //{AudioSource}.stop()が呼ばれたときか、最後まで{AudioSource}が流れたときに呼ばれるリスナー
+        const voiceSourceListner = (e: Event) => {
             if (this._audioContext === null || this.voiceSource === null) {
                 throw new Error("無効なended");
             }
@@ -909,41 +961,22 @@ export class CustomModel extends EventEmitter {
                 throw new Error("モデルにAudioBufferがセットされていない");
             }
 
-            //console.log("AudioNodeストップ");
-            if (this.voiceSource.buffer?.duration <= this._audioContext.currentTime - startVoiceTime && this.intervalVoiceID !== null) {
+            //最後まで話したときのみ実行;
+            if (this.voiceSource.buffer?.duration <= this._audioContext.currentTime - startVoiceTime) {
                 this.emit("FinishSpeak"); //-------------------------------
-                this.voicing = false;
-                window.clearInterval(this.intervalVoiceID);
+                this.speakState = SpeakState.Noting;
             }
-        });
+
+            //最後まで話していても話していなくてもする処理
+            pixiApp.ticker.remove(settedTickerListner);
+            this.voiceVolume = 0;
+        };
+
+        //再生終了時にstop()するリスナー登録
+        //-------------------------------------------------------ここで登録されたリスナーはAudioSourceNode.stop()時にじっこうされるので注意
+        this.voiceSource.addEventListener("ended", voiceSourceListner);
         //再生開始
         this.voiceSource.start();
-
-        //解析する
-        //ループするリスナー登録
-        this.intervalVoiceID = window.setInterval(() => {
-            // 一秒あたりfftSize個に分割した音量を取得する
-            const timeVolumes = new Uint8Array(analyser.fftSize);
-            analyser.getByteTimeDomainData(timeVolumes);
-            const currentVolume = normalizeLastVolume(timeVolumes); //音量を0～1に正規化
-            this.voiceVolume = currentVolume;
-
-            function normalizeLastVolume(volumes: Uint8Array) {
-                // console.log((times[times.length - 1] - ave) / he);
-                //値を正規化
-                const tmp = (volumes[volumes.length - 1] - Math.min(...volumes)) / (Math.max(...volumes) - Math.min(...volumes));
-                //127,128が多ければ無音と考える削除する
-                let cnt = 0;
-                volumes.forEach((currentValue: number) => {
-                    if (currentValue === 127 || currentValue === 128) {
-                        cnt += 1;
-                    }
-                });
-                //条件は127,128のかずが半分以下、Nanじゃない、1と0じゃない
-                const volume = cnt < (volumes.length - 1) / 2 && isNaN(tmp) !== true && 0 < tmp && tmp < 1 ? tmp : 0;
-                return volume;
-            }
-        }, 1000 / frequency);
     };
 
     /**
@@ -953,20 +986,18 @@ export class CustomModel extends EventEmitter {
         if (this.model === null) {
             throw new Error("モデルがないです");
         }
-        if (this.speaking === false && this.voicing === false) {
+        if (this.speakState === SpeakState.Noting) {
             console.log("口パク・発声していないので何もしない");
+            return;
         }
         //
         //前の音を止める
-        if (this.voicing === true && this.intervalVoiceID !== null) {
+        if ((this.speakState = SpeakState.Voicing)) {
+            //音声再生時の処理はended関数で実行している。
             this.voiceSource?.stop();
-            window.clearInterval(this.intervalVoiceID);
-            this.intervalVoiceID = null;
         }
-        this.speaking = false;
-        this.voicing = false;
+        this.speakState = SpeakState.Noting;
         this.speakSpeed = 0;
-        this.voiceVolume = 0;
         this.emit("StopSpeak"); //---------------------------------------------
     };
 
