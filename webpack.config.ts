@@ -29,33 +29,43 @@
  * dist以下 {（dist_js & dist_css）      & (dist_html)            & (dist_Resources)}
  *
  */
-
-const path = require("path");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
-const HtmlWebpackHarddiskPlugin = require("html-webpack-harddisk-plugin");
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const CopyPlugin = require("copy-webpack-plugin");
+//  const path = require("path");
+//  const HtmlWebpackPlugin = require("html-webpack-plugin");
+//  const HtmlWebpackHarddiskPlugin = require("html-webpack-harddisk-plugin");
+//  const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+//  const CopyPlugin = require("copy-webpack-plugin");
 //const webpack = require("webpack");
 //const { CleanWebpackPlugin } = require("clean-webpack-plugin");//Webpack5では要らない代わりにoutput.clean = true を使う
+
+/** 以下 2 行は補完を効かせるためのインポート https://zenn.dev/sprout2000/articles/9d026d3d9e0e8f#webpack.config-%E3%82%92-typescript-%E3%81%A7%E8%A8%98%E8%BF%B0%E3%81%99%E3%82%8B */
+import "webpack-dev-server";
+import { Configuration } from "webpack";
+
+//webpackのプラグイン
+import path from "path";
+import HtmlWebpackPlugin from "html-webpack-plugin";
+import HtmlWebpackHarddiskPlugin from "html-webpack-harddisk-plugin";
+import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import CopyPlugin from "copy-webpack-plugin";
 
 // [定数] webpack の出力オプションを指定します
 // 'production' か 'development' を指定
 //https://zenn.dev/sprout2000/articles/9d026d3d9e0e8f#node_env-%E3%81%A7%E5%87%A6%E7%90%86%E3%82%92%E5%88%86%E5%B2%90%E3%81%99%E3%82%8B
-const MODE = process.env.NODE_ENV;
-
-// CSSソースマップの利用有無(productionのときはソースマップを利用しない)
-const enabledSourceMap = MODE === "development" ? true : false;
-let enableDevTool;
-let publicPath;
-if (MODE === "development") {
-    enableDevTool = "inline-source-map";
-    publicPath = "/";
-} else {
-    enableDevTool = false;
-    publicPath = undefined;
+if (process.env.NODE_ENV === void 0) {
+    throw new Error("NODE_ENVが設定されていない");
 }
 
-const app = {
+const isDev = process.env.NODE_ENV === "development" ? true : false;
+const MODE = isDev === true ? "development" : "production";
+
+console.log(`モードは「${MODE}」`);
+// CSSソースマップの利用有無(productionのときはソースマップを利用しない)
+const enabledSourceMap = isDev === true ? true : false;
+//jsのソースマップを有効にするかどうか
+const enableDevTool = isDev === true ? "inline-source-map" : false;
+const publicPath = isDev === true ? "/" : void 0;
+
+const config: Configuration = {
     // モード値を production に設定すると最適化された状態で、
     // development に設定するとソースマップ有効でJSファイルが出力される
     mode: MODE,
@@ -349,10 +359,10 @@ const app = {
 //     test: ["test"],
 // };
 
-// app.entry = entries;
+// config.entry = entries;
 
 // Object.keys(htmlSrc).forEach((currentValue) => {
-//     app.plugins.push(
+//     config.plugins.push(
 //         new HtmlWebpackPlugin({
 //             filename: `${currentValue}.html`,
 //             //publicPath: "dist/",
@@ -366,4 +376,5 @@ const app = {
 //     );
 // });
 
-module.exports = app;
+// 設定をデフォルトエクスポート
+export default config;

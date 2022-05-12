@@ -102,6 +102,14 @@
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */
     },
-    "include": ["src/**/*.ts"],
+
+    //ts-node用の設定 https://zenn.dev/sprout2000/articles/9d026d3d9e0e8f#webpack.config-%E3%82%92-typescript-%E3%81%A7%E8%A8%98%E8%BF%B0%E3%81%99%E3%82%8B
+    "ts-node": {
+        "compilerOptions": {
+          "module": "CommonJS"
+        }
+    },
+
+    "include": ["src/**/*.ts", "webpack.config.ts"],
     "exclude": ["node_modules", "dist"]
 }
