@@ -110,6 +110,11 @@ export class MyCanvas {
         // dai.addChild(hiyoriModel);
         // stage.addChild(dai);
         stage.addChild(hiyoriModel);
+        // hiyoriModel.on("click", (event: PIXI.InteractionEvent) => {
+        //     console.log("クリック");
+        //     console.log(hiyoriModel.width, hiyoriModel.height);
+        //     console.log(event.data.global);
+        // });
         //デバッグすらならモデルの収まっている四角形とHitAreaを表示
         if (this.debug === true) {
             this.hiyori.displayBox();
@@ -118,6 +123,7 @@ export class MyCanvas {
         //this.hiyori.hitAreaOff();
         this.hiyori.idleGroup = "Idle"; //ひよりの通常時のモーショングループ
         this.hiyori.draggable = true; //ひよりをドラッグできる
+        this.hiyori.mouseLooking = false;
 
         //リスナー登録していく
         //モデルをタップした時の動作を追加
@@ -152,6 +158,8 @@ export class MyCanvas {
             //マウスを見るかの調整
             if (this.hiyori.isBoxOn === false) {
                 this.hiyori.mouseLooking = false;
+                const hiyoriGlobal = this.hiyori.modelGlobalPoint as PIXI.Point;
+                this.hiyori.setFocus(hiyoriGlobal.x, hiyoriGlobal.y);
             } else {
                 this.hiyori.mouseLooking = true;
             }

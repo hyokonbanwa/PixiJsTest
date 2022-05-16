@@ -56,6 +56,7 @@ export class CustomModel extends EventEmitter {
     private containerScaleX: number; //コンテナの大きさ倍率x
     private containerScaleY: number; //コンテナの大きさ倍率y
     private containerAngle: number;
+    private containerPoint: PIXI.Point;
 
     private modelBox: PIXI.Graphics; //モデルの枠＝箱
     private boxWidth: number; //モデルの枠の横幅
@@ -98,6 +99,9 @@ export class CustomModel extends EventEmitter {
     private _audioContext: AudioContext | null; //AudioContext
     private voiceSource: AudioBufferSourceNode | null; //受け取ったaudioBufferをセットするAudioBufferSourceNode
 
+    //視線関係：
+    private focusPoint: PIXI.Point;
+
     /**
      *モデルの設定の初期化
      * @param {string} modelPath モデルのパス(~~/hoge.model3.json)を指定する
@@ -123,6 +127,7 @@ export class CustomModel extends EventEmitter {
         this.containerScaleX = 1.0;
         this.containerScaleY = 1.0;
         this.containerAngle = 0;
+        this.containerPoint = this.container.getGlobalPosition();
         this.modelBox = new PIXI.Graphics();
         this.modelBox.beginFill(0xffff99).drawRect(0, 0, this.boxWidth, this.boxHeight).endFill();
         this.modelBox.pivot.set(this.boxWidth / 2, this.boxHeight / 2);
@@ -159,6 +164,8 @@ export class CustomModel extends EventEmitter {
 
         this._audioContext = null;
         this.voiceSource = null;
+
+        this.focusPoint = new PIXI.Point(0, 0);
     }
 
     /**
@@ -183,6 +190,31 @@ export class CustomModel extends EventEmitter {
                 this.modelHitArea.visible = false;
                 this.model?.addChild(this.modelHitArea);
                 this.container.addChild(this.model);
+
+                //アルファフィルターでモデルをカット
+                //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
+                //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
+                //見えなくなるだけで当たり判定は存在している
+                //------------------modelBoxで位置調整する場合
+                const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
+                const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
+                //filterAreaの位置調整
+                filterArea.x -= this.boxWidth / 2;
+                filterArea.y -= this.boxHeight / 2;
+                //------------------
+                // //-------------------containerで位置調整する場合
+                // const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+                // const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+                // //filterAreaの位置調整
+                // filterArea.x -= this.container.pivot.x * this.containerScaleX;
+                // filterArea.y -= this.container.pivot.y * this.containerScaleY;
+                // //---------------------------
+                this.container.filterArea = filterArea;
+                this.filterRectagle = filterArea;
+
+                // //containerの当たり判定を設定;
+                const hitArea = new PIXI.Rectangle(0, 0, this.modelBox.width, this.modelBox.height);
+                this.container.hitArea = hitArea;
             }
         };
         setPosition();
@@ -488,13 +520,21 @@ export class CustomModel extends EventEmitter {
         const deltaMs = 1000 / frameRate; //前回からの経過時間を求める
         this.model?.update(deltaMs);
 
-        //拡大縮小回転に対応
-        if (this.containerScaleX !== this.container.scale.x || this.containerScaleY !== this.container.scale.y || this.containerAngle !== this.container.angle) {
+        //移動拡大縮小回転に対応
+        if (
+            this.containerPoint.x !== this.container.getGlobalPosition().x ||
+            this.containerPoint.y !== this.container.getGlobalPosition().y ||
+            this.containerScaleX !== this.container.scale.x ||
+            this.containerScaleY !== this.container.scale.y ||
+            this.containerAngle !== this.container.angle
+        ) {
             //コンテナの現在の倍率：変わる前の倍率を求める
             const currentExRateX = this.container.scale.x / this.containerScaleX;
             const currentExRateY = this.container.scale.y / this.containerScaleY;
 
             //フィルター用のrentagleに使っている大きさを更新
+            // this.boxWidth = this.boxWidth * currentExRateX;
+            // this.boxHeight = this.boxHeight * currentExRateY;
             this.boxWidth = this.boxWidth * currentExRateX;
             this.boxHeight = this.boxHeight * currentExRateY;
 
@@ -505,37 +545,47 @@ export class CustomModel extends EventEmitter {
             //containerの回転に対応
             this.modelBox.angle = -this.container.angle;
 
+            //アルファフィルターでモデルをカット
+            //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
+            //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
+            //見えなくなるだけで当たり判定は存在している
+            //------------------modelBoxで位置調整する場合
+            const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
+            const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
+            //filterAreaの位置調整
+            filterArea.x -= this.boxWidth / 2;
+            filterArea.y -= this.boxHeight / 2;
+            //------------------
+            // //-------------------containerで位置調整する場合
+            // const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
+            // const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
+            // //filterAreaの位置調整
+            // filterArea.x -= this.container.pivot.x * this.containerScaleX;
+            // filterArea.y -= this.container.pivot.y * this.containerScaleY;
+            // //---------------------------
+            this.container.filterArea = filterArea;
+            this.filterRectagle = filterArea;
+
+            // //containerの当たり判定を設定;
+            const hitArea = new PIXI.Rectangle(0, 0, this.modelBox.width, this.modelBox.height);
+            this.container.hitArea = hitArea;
+
             //現在のコンテナの倍率を記憶
             this.containerScaleX = this.container.scale.x;
             this.containerScaleY = this.container.scale.y;
             this.containerAngle = this.container.angle;
+            this.containerPoint = this.container.getGlobalPosition();
         }
 
-        //アルファフィルターでモデルをカット
-        //maskの代わりにフィルターを使う　https://www.html5gamedevs.com/topic/28506-how-to-crophide-over-flow-of-sprites-which-clip-outside-of-the-world-boundaries/
-        //voidFilter無いのでAlphaFilterを使う　https://api.pixijs.io/@pixi/filter-alpha/PIXI/filters/AlphaFilter.html
-        //見えなくなるだけで当たり判定は存在している
-        //------------------modelBoxで位置調整する場合
-        const modelBoxGlobal: PIXI.Point = this.modelBox.getGlobalPosition();
-        const filterArea = new PIXI.Rectangle(modelBoxGlobal.x, modelBoxGlobal.y, this.boxWidth, this.boxHeight);
-        //filterAreaの位置調整
-        filterArea.x -= this.boxWidth / 2;
-        filterArea.y -= this.boxHeight / 2;
-        //------------------
-        // //-------------------containerで位置調整する場合
-        // const containerGlobal: PIXI.Point = this.container.getGlobalPosition();
-        // const filterArea = new PIXI.Rectangle(containerGlobal.x, containerGlobal.y, this.boxWidth, this.boxHeight);
-        // //filterAreaの位置調整
-        // filterArea.x -= this.container.pivot.x * this.containerScaleX;
-        // filterArea.y -= this.container.pivot.y * this.containerScaleY;
-        // //---------------------------
-        this.container.filterArea = filterArea;
-        this.filterRectagle = filterArea;
-
         //マウスを見るかの調整
+        //常にマウスを見る設定なので、falseの時は指定されたポイントを見るようにする
         if (this.mouseLooking === false) {
-            const modelGlobal: PIXI.Point = this.model.getGlobalPosition() as PIXI.Point;
-            this.model.focus(modelGlobal.x, modelGlobal.y);
+            this.model.focus(this.focusPoint.x, this.focusPoint.y);
+            // console.log("場所");
+            // console.log(this.focusPoint);
+            //const modelGlobal: PIXI.Point = this.model.getGlobalPosition() as PIXI.Point;
+            // console.log(modelGlobal);
+            //this.model.focus(modelGlobal.x, modelGlobal.y);
         }
 
         this.emit("ModelUpdate"); //----------------------------------------------------------------------------------
@@ -716,6 +766,11 @@ export class CustomModel extends EventEmitter {
         return settings;
     }
 
+    get modelGlobalPoint(): PIXI.Point | void {
+        if (this.model === null) return;
+        return this.model.getGlobalPosition();
+    }
+
     onHitAreaOver = (listner: (hitAreas: string[]) => void) => {
         this.addListener("HitAreaOver", listner);
     };
@@ -843,6 +898,7 @@ export class CustomModel extends EventEmitter {
             throw new Error("モデルがないです");
         }
         this.model.focus(x, y);
+        this.focusPoint.set(x, y);
     };
 
     /**
