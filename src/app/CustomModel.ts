@@ -1048,7 +1048,7 @@ export class CustomModel extends EventEmitter {
         }
         //
         //前の音を止める
-        if ((this.speakState = SpeakState.Voicing)) {
+        if (this.speakState === SpeakState.Voicing) {
             //音声再生時の処理はended関数で実行している。
             this.voiceSource?.stop();
         }
