@@ -6,8 +6,8 @@ export {};
 {
     //http://localhost:40080
     //http://192.168.3.10:40080
-    const serverURL = "http://192.168.3.10:40080";
-    const debug: boolean = false;
+    const serverURL = "http://localhost:50021"; //"http://192.168.3.10:40080";
+    const debug: boolean = true;
     const modelPath = "/Resources/Hiyori_2/Hiyori.model3.json";
 
     //550, 900, 0.235, 0, -20 モデル全身/
